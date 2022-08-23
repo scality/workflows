@@ -1,0 +1,8 @@
+on: push
+
+jobs:
+  docker-build:
+    uses: ./.github/workflows/docker-build.yaml
+    with:
+      context: tests/docker
+      name: test
