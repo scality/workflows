@@ -34,7 +34,7 @@ on:
       file:
         required: false
         type: string
-        default: Dockerfile
+        default: ${{ inputs.context }}/Dockerfile
       build-args:
         required: false
         type: string
