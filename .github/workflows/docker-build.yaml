@@ -73,3 +73,4 @@ jobs:
         cache-from: type=gha,scope=${{ inputs.name }}
         cache-to: type=gha,mode=max,scope=${{ inputs.name }}
         build-args: ${{ inputs.build-args }}
+        file: ${{ inputs.file }}
