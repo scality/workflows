@@ -23,10 +23,10 @@ on:
         required: false
         type: boolean
         default: true
-      cache:
+      no-cache:
         required: false
         type: boolean
-        default: true
+        default: false
       context:
         required: false
         type: string
@@ -72,5 +72,6 @@ jobs:
         tags: ${{ inputs.registry }}/${{ inputs.namespace }}/${{ inputs.name }}:${{ inputs.tag }}
         cache-from: type=gha,scope=${{ inputs.name }}
         cache-to: type=gha,mode=max,scope=${{ inputs.name }}
+        no-cache: ${{ inputs.no-cache }}
         build-args: ${{ inputs.build-args }}
         file: ${{ env.FILE }}
