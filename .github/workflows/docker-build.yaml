@@ -34,7 +34,6 @@ on:
       file:
         required: false
         type: string
-        default: ${{ inputs.context }}/Dockerfile
       build-args:
         required: false
         type: string
@@ -49,6 +48,7 @@ jobs:
     env:
       REGISTRY_LOGIN: "${{ secrets.REGISTRY_LOGIN || github.repository_owner }}"
       REGISTRY_PASSWORD: "${{ secrets.REGISTRY_PASSWORD || secrets.GITHUB_TOKEN }}"
+      FILE: ${{ inputs.file || inputs.context + '/Dockerfile' }}
     runs-on: ubuntu-latest
     steps:
     - name: Checkout
@@ -73,4 +73,4 @@ jobs:
         cache-from: type=gha,scope=${{ inputs.name }}
         cache-to: type=gha,mode=max,scope=${{ inputs.name }}
         build-args: ${{ inputs.build-args }}
-        file: ${{ inputs.file }}
+        file: ${{ env.FILE }}
