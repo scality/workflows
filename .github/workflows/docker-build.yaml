@@ -41,6 +41,10 @@ on:
         required: false
         type: boolean
         default: false
+      provenance:
+        required: false
+        type: boolean
+        default: false
     secrets:
       REGISTRY_LOGIN:
         required: false
@@ -74,6 +78,7 @@ jobs:
       uses: docker/build-push-action@v2
       with:
         context: ${{ inputs.context }}
+        provenance: ${{ inputs.provenance }}
         push: ${{ inputs.push }}
         tags: ${{ inputs.registry }}/${{ inputs.namespace }}/${{ inputs.name }}:${{ inputs.tag }}
         cache-from: type=gha,scope=${{ inputs.name }}
