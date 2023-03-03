@@ -49,7 +49,6 @@ jobs:
 For more information about all inputs available checkout
 the [workflow definition](./.github/workflows/docker-build.yaml).
 
-
 ## Known issues
 
 ### Using secrets or env properties as inputs is not supported
@@ -90,3 +89,21 @@ to be called with the `secrets` parameter
       with:
         foo: ${{ needs.previous-job.outputs.foo }}
   ```
+
+## Trivy
+
+`trivy.yaml` is a GitHub Actions configuration file that utilizes Trivy,
+an open-source vulnerability scanner for Docker containers and images.
+The action is triggered when a workflow is called with an image-ref input.
+It performs the following steps:
+
+1. Checkout the repository with actions/checkout@v3.
+2. Scan the specified Docker image with Trivy using
+`aquasecurity/trivy-action@master`. The scan options include `image-ref`,
+`format`, `output`, `ignore-unfixed`, and `vuln-type`.
+3. Upload the Trivy scan results in SARIF format to GitHub Security tab
+using `github/codeql-action/upload-sarif@v2`.
+
+This configuration file enables easy integration of vulnerability scanning
+for Docker images into a GitHub CI/CD pipeline. Results can be viewed in the
+GitHub Security tab for further analysis and vulnerability remediation.
