@@ -47,8 +47,7 @@ jobs:
 ```
 
 For more information about all inputs available checkout
-the [workflow definition](./.github/workflows/docker-build.yaml).
-
+the [workflow definition](https://github.com/scality/workflows/blob/main/.github/workflows/docker-build.yaml).
 
 ## Known issues
 
