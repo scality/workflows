@@ -10,6 +10,6 @@ jobs:
   trivy:
     needs: bocker-build
     name: Trivy Vulnerability Scan for Docker images
-    uses: scality/workflows/.github/workflows/trivy.yaml
+    uses: scality/workflows/.github/workflows/trivy.yaml@main
     with:
       image-ref: '${{ inputs.registry }}/${{ inputs.namespace }}/${{ inputs.name }}:${{ inputs.tag }}'
