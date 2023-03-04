@@ -12,4 +12,4 @@ jobs:
     name: Trivy Vulnerability Scan for Docker images
     uses: scality/workflows/.github/workflows/trivy.yaml@main
     with:
-      image-ref: '${{ inputs.registry }}/${{ inputs.namespace }}/${{ inputs.name }}:${{ inputs.tag }}'
+      image-ref: 'ghcr.io/${{ github.repository }}/test:${{ github.sha }}'
