@@ -8,7 +8,7 @@ jobs:
       name: test
 
   trivy:
-    needs: bocker-build
+    needs: docker-build
     name: Trivy Vulnerability Scan for Docker images
     uses: scality/workflows/.github/workflows/trivy.yaml@main
     with:
