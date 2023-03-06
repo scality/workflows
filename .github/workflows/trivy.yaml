@@ -4,6 +4,47 @@ name: trivy
 on:
   workflow_call:
     inputs:
+      name:
+        required: true
+        type: string
+      namespace:
+        required: false
+        type: string
+        default: ${{ github.repository }}
+      tag:
+        required: false
+        type: string
+        default: "${{ github.sha }}"
+      registry:
+        required: false
+        type: string
+        default: ghcr.io
+      push:
+        required: false
+        type: boolean
+        default: true
+      no-cache:
+        required: false
+        type: boolean
+        default: false
+      context:
+        required: false
+        type: string
+        default: .
+      file:
+        required: false
+        type: string
+      build-args:
+        required: false
+        type: string
+      lfs:
+        required: false
+        type: boolean
+        default: false
+      provenance:
+        required: false
+        type: boolean
+        default: false
       image-ref:
         default: "ghcr.io/${{ github.repository }}:${{ github.sha }}"
         required: false
@@ -12,8 +53,8 @@ on:
 jobs:
   trivy:
     env:
-      REGISTRY_LOGIN: "${{ secrets.REGISTRY_LOGIN || github.repository_owner }}"
-      REGISTRY_PASSWORD: "${{ secrets.REGISTRY_PASSWORD || secrets.GITHUB_TOKEN }}"
+      REGISTRY_LOGIN: "${{github.repository_owner}}"
+      REGISTRY_PASSWORD: "${{secrets.GITHUB_TOKEN}}"
       FILE: ${{ inputs.file || format('{0}/Dockerfile', inputs.context) }}
     name: Trivy Vulnerability Scan for images
     runs-on: ubuntu-latest
