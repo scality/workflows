@@ -9,6 +9,6 @@ jobs:
 
   trivy:
     needs: docker-build
-    uses: scality/workflows/.github/workflows/trivy.yaml@main
+    uses: ./.github/workflows/trivy.yaml
     with:
       image-ref: 'ghcr.io/${{ github.repository }}/test:${{ github.sha }}'
