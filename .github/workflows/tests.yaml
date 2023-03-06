@@ -11,4 +11,6 @@ jobs:
     needs: docker-build
     uses: ./.github/workflows/trivy.yaml
     with:
+      context: tests/docker
+      name: trivy_test
       image-ref: 'ghcr.io/${{ github.repository }}/test:${{ github.sha }}'
