@@ -53,19 +53,12 @@ on:
 jobs:
   trivy:
     env:
-      REGISTRY_LOGIN: "${{github.repository_owner}}"
-      REGISTRY_PASSWORD: "${{secrets.GITHUB_TOKEN}}"
+      TRIVY_USERNAME: "${{github.repository_owner}}"
+      TRIVY_PASSWORD: "${{secrets.GITHUB_TOKEN}}"
       FILE: ${{ inputs.file || format('{0}/Dockerfile', inputs.context) }}
     name: Trivy Vulnerability Scan for images
     runs-on: ubuntu-latest
     steps:
-      - name: Login to ${{ inputs.registry }}
-        uses: docker/login-action@v1
-        with:
-          registry: ${{ inputs.registry }}
-          username: ${{ env.REGISTRY_LOGIN }}
-          password: ${{ env.REGISTRY_PASSWORD }}
-        
       - name: Checkout code
         uses: actions/checkout@v3
 
