@@ -12,4 +12,5 @@ jobs:
     uses: ./.github/workflows/trivy.yaml
     with:
       name: trivy_test
+      placeholder: '/test'
       image-ref: 'ghcr.io/${{ github.repository }}/test:${{ github.sha }}'
