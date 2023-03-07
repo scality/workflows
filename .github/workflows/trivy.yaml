@@ -9,15 +9,15 @@ on:
       namespace:
         required: false
         type: string
-        default: ${{ github.repository }}
+        default: "${{ github.repository }}"
       tag:
         required: false
         type: string
-        default: ${{ github.sha }}
+        default: "${{ github.sha }}"
       registry:
         required: false
         type: string
-        default: ghcr.io
+        default: "ghcr.io"
       push:
         required: false
         type: boolean
