@@ -28,8 +28,8 @@ on:
 jobs:
   trivy:
     env:
-      TRIVY_USERNAME: "${{ github.repository_owner }}"
-      TRIVY_PASSWORD: "${{ secrets.GITHUB_TOKEN }}"
+      TRIVY_USERNAME: "${{ secrets.REGISTRY_LOGIN || github.repository_owner }}"
+      TRIVY_PASSWORD: "${{ secrets.REGISTRY_PASSWORD || secrets.GITHUB_TOKEN }}"
     name: Trivy Vulnerability Scan for ${{ inputs.name }}
     runs-on: ubuntu-latest
     steps:
@@ -39,7 +39,7 @@ jobs:
       - name: Image Scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: "${{ inputs.registry }}/${{ inputs.namespace }}:${{ inputs.tag }}"
+          image-ref: "ghcr.io/${{ github.repository }}:${{ github.sha }}"
           format: 'sarif'
           output: 'trivy-image-results.sarif'
           ignore-unfixed: true
