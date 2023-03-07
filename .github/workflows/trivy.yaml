@@ -18,6 +18,10 @@ on:
         required: false
         type: string
         default: "ghcr.io"
+      placeholder:
+        required: false
+        type: string
+        default: ""
       image-ref:
          default: "ghcr.io/${{ github.repository }}:${{ github.sha }}"
          required: false
@@ -42,7 +46,7 @@ jobs:
       - name: Image Scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ inputs.image-ref }}
+          image-ref: "${{ inputs.registry }}/${{ inputs.namespace }}${{ inputs.placeholder }}:${{ inputs.tag }}"
           format: 'sarif'
           output: 'trivy-image-results.sarif'
           ignore-unfixed: true
