@@ -19,6 +19,10 @@ on:
         required: false
         type: string
         default: ghcr.io
+      image-ref:
+         default: "ghcr.io/${{ github.repository }}:${{ github.sha }}"
+         required: false
+         type: string
     secrets:
       REGISTRY_LOGIN:
         required: false
