@@ -38,6 +38,7 @@ theme:
     code: Roboto Mono
 
 nav:
+- Home: index.md
 - Docker build: docker-build.md
 - Known issues: known-issues.md
 
