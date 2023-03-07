@@ -46,7 +46,7 @@ jobs:
       - name: Image Scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: "${{ inputs.registry }}/${{ inputs.namespace }}${{ inputs.placeholder }}:${{ inputs.tag }}"
+          image-ref: "${{ inputs.registry }}/${{ inputs.namespace }}/${{ inputs.name }}:${{ inputs.tag }}"
           format: 'sarif'
           output: 'trivy-image-results.sarif'
           ignore-unfixed: true
