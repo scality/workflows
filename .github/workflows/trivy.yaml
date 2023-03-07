@@ -1,6 +1,5 @@
 ---
 name: trivy
-
 on:
   workflow_call:
     inputs:
@@ -19,16 +18,42 @@ on:
         required: false
         type: string
         default: ghcr.io
+      push:
+        required: false
+        type: boolean
+        default: true
+      no-cache:
+        required: false
+        type: boolean
+        default: false
+      context:
+        required: false
+        type: string
+        default: .
+      file:
+        required: false
+        type: string
+      build-args:
+        required: false
+        type: string
+      lfs:
+        required: false
+        type: boolean
+        default: false
+      provenance:
+        required: false
+        type: boolean
+        default: false
       image-ref:
          default: "ghcr.io/${{ github.repository }}:${{ github.sha }}"
          required: false
          type: string
     secrets:
-      REGISTRY_LOGIN:
-        required: false
-      REGISTRY_PASSWORD:
-        required: false
-
+     REGISTRY_LOGIN:
+       required: false
+     REGISTRY_PASSWORD:
+       required: false
+ 
 jobs:
   trivy:
     env:
