@@ -18,10 +18,6 @@ on:
         required: false
         type: string
         default: "ghcr.io"
-      placeholder:
-        required: false
-        type: string
-        default: ""
       image-ref:
          default: "ghcr.io/${{ github.repository }}:${{ github.sha }}"
          required: false
