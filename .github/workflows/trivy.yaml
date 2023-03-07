@@ -55,7 +55,6 @@ jobs:
     env:
       TRIVY_USERNAME: "${{github.repository_owner}}"
       TRIVY_PASSWORD: "${{secrets.GITHUB_TOKEN}}"
-      FILE: ${{ inputs.file || format('{0}/Dockerfile', inputs.context) }}
     name: Trivy Vulnerability Scan for images
     runs-on: ubuntu-latest
     steps:
