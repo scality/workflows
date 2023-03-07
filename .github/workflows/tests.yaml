@@ -6,3 +6,9 @@ jobs:
     with:
       context: tests/docker
       name: test
+
+  trivy:
+    needs: docker-build
+    uses: ./.github/workflows/trivy.yaml
+    with:
+      name: '/test'

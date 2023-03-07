@@ -1,0 +1,51 @@
+---
+name: trivy
+on:
+  workflow_call:
+    inputs:
+      name:
+        required: true
+        type: string
+      namespace:
+        required: false
+        type: string
+        default: "${{ github.repository }}"
+      tag:
+        required: false
+        type: string
+        default: "${{ github.sha }}"
+      registry:
+        required: false
+        type: string
+        default: "ghcr.io"
+    secrets:
+      REGISTRY_LOGIN:
+        required: false
+      REGISTRY_PASSWORD:
+        required: false
+ 
+jobs:
+  trivy:
+    env:
+      TRIVY_USERNAME: "${{ secrets.REGISTRY_LOGIN || github.repository_owner }}"
+      TRIVY_PASSWORD: "${{ secrets.REGISTRY_PASSWORD || secrets.GITHUB_TOKEN }}"
+    name: Trivy Vulnerability Scan for images
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Image Scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "${{ inputs.registry }}/${{ inputs.namespace }}/${{ inputs.name }}:${{ inputs.tag }}"
+          format: 'sarif'
+          output: 'trivy-image-results.sarif'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+
+      - name: Upload Trivy Image scan results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-image-results.sarif'
+          category: 'image'
