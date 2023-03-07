@@ -49,7 +49,11 @@ on:
         default: "ghcr.io/${{ github.repository }}:${{ github.sha }}"
         required: false
         type: string
-
+    secrets:
+      REGISTRY_LOGIN:
+        required: false
+      REGISTRY_PASSWORD:
+        required: false
 jobs:
   trivy:
     env:
