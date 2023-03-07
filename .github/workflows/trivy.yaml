@@ -19,47 +19,18 @@ on:
         required: false
         type: string
         default: ghcr.io
-      push:
-        required: false
-        type: boolean
-        default: true
-      no-cache:
-        required: false
-        type: boolean
-        default: false
-      context:
-        required: false
-        type: string
-        default: .
-      file:
-        required: false
-        type: string
-      build-args:
-        required: false
-        type: string
-      lfs:
-        required: false
-        type: boolean
-        default: false
-      provenance:
-        required: false
-        type: boolean
-        default: false
-      image-ref:
-        default: "ghcr.io/${{ github.repository }}:${{ github.sha }}"
-        required: false
-        type: string
     secrets:
       REGISTRY_LOGIN:
         required: false
       REGISTRY_PASSWORD:
         required: false
+
 jobs:
   trivy:
     env:
-      TRIVY_USERNAME: "${{github.repository_owner}}"
-      TRIVY_PASSWORD: "${{secrets.GITHUB_TOKEN}}"
-    name: Trivy Vulnerability Scan for images
+      TRIVY_USERNAME: "${{ secrets.REGISTRY_LOGIN || github.repository_owner }}"
+      TRIVY_PASSWORD: "${{ secrets.REGISTRY_PASSWORD || secrets.GITHUB_TOKEN }}"
+    name: Trivy Vulnerability Scan for ${{ inputs.name }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
@@ -68,7 +39,7 @@ jobs:
       - name: Image Scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ inputs.image-ref }}
+          image-ref: "${{ inputs.registry }}/${{ inputs.namespace }}:${{ inputs.tag }}"
           format: 'sarif'
           output: 'trivy-image-results.sarif'
           ignore-unfixed: true
