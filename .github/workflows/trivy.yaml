@@ -18,41 +18,15 @@ on:
         required: false
         type: string
         default: "ghcr.io"
-      push:
-        required: false
-        type: boolean
-        default: true
-      no-cache:
-        required: false
-        type: boolean
-        default: false
-      context:
-        required: false
-        type: string
-        default: .
-      file:
-        required: false
-        type: string
-      build-args:
-        required: false
-        type: string
-      lfs:
-        required: false
-        type: boolean
-        default: false
-      provenance:
-        required: false
-        type: boolean
-        default: false
       image-ref:
          default: "ghcr.io/${{ github.repository }}:${{ github.sha }}"
          required: false
          type: string
     secrets:
-     REGISTRY_LOGIN:
-       required: false
-     REGISTRY_PASSWORD:
-       required: false
+      REGISTRY_LOGIN:
+        required: false
+      REGISTRY_PASSWORD:
+        required: false
  
 jobs:
   trivy:
@@ -68,7 +42,7 @@ jobs:
       - name: Image Scan
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: '${{ inputs.registry }}/${{ inputs.namespace }}:${{ inputs.tag }}'
+          image-ref: ${{ inputs.image-ref }}
           format: 'sarif'
           output: 'trivy-image-results.sarif'
           ignore-unfixed: true
