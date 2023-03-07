@@ -57,8 +57,8 @@ on:
 jobs:
   trivy:
     env:
-      TRIVY_USERNAME: "${{github.repository_owner}}"
-      TRIVY_PASSWORD: "${{secrets.GITHUB_TOKEN}}"
+      TRIVY_USERNAME: "${{ secrets.REGISTRY_LOGIN || github.repository_owner }}"
+      TRIVY_PASSWORD: "${{ secrets.REGISTRY_PASSWORD || secrets.GITHUB_TOKEN }}"
     name: Trivy Vulnerability Scan for images
     runs-on: ubuntu-latest
     steps:
