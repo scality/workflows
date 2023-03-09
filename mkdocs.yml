@@ -40,6 +40,7 @@ theme:
 nav:
 - Home: index.md
 - Docker build: docker-build.md
+- Trivy: trivy.md
 - Known issues: known-issues.md
 
 markdown_extensions:
