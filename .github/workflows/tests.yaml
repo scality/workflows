@@ -1,5 +1,10 @@
 on: push
 
+permissions:
+  packages: write
+  contents: read
+  security-events: write
+
 jobs:
   docker-build:
     uses: ./.github/workflows/docker-build.yaml
