@@ -41,6 +41,7 @@ nav:
 - Home: index.md
 - Docker build: docker-build.md
 - Known issues: known-issues.md
+- Trivy: trivy.md
 
 markdown_extensions:
   - pymdownx.highlight:
