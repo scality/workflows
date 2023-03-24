@@ -15,6 +15,12 @@ on:
         required: false
         type: string
         default: "${{ github.sha }}"
+      labels:
+        required: false
+        type: string
+        default: |
+          git.repository=${{ github.repository }}
+          git.commit-sha=${{ github.sha }}
       registry:
         required: false
         type: string
@@ -81,6 +87,7 @@ jobs:
         provenance: ${{ inputs.provenance }}
         push: ${{ inputs.push }}
         tags: ${{ inputs.registry }}/${{ inputs.namespace }}/${{ inputs.name }}:${{ inputs.tag }}
+        labels: ${{ inputs.labels }}
         cache-from: type=gha,scope=${{ inputs.name }}
         cache-to: type=gha,mode=max,scope=${{ inputs.name }}
         no-cache: ${{ inputs.no-cache }}
