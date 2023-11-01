@@ -29,6 +29,8 @@ jobs:
   check:
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
       - name: lfs warning
         uses: ppremk/lfs-warning@v3.2
         with:
