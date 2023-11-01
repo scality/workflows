@@ -1,0 +1,36 @@
+---
+
+# This workflow is a reusable workflow meant to be called on pull_request events.
+# The goal is to check the files in the pull request to make sure they respect the file size limit.
+# If the file size limit is exceeded, and the file has not been commited via git lfs, then
+# the workflow will fail, a label will be added to the pull request along with a comment.
+
+name: lfs-warning
+
+on:
+  workflow_call:
+    inputs:
+      filesizelimit:
+        description: 'The file size limit'
+        required: false
+        default: 1MB
+        type: string
+      labelname:
+        description: 'The label name'
+        required: false
+        default: bug
+        type: string
+
+permissions:
+  pull-requests: write
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: lfs warning
+        uses: ppremk/lfs-warning@v3.2
+        with:
+          filesizelimit: ${{ inputs.filesizelimit }}
+          labelName: ${{ inputs.labelname }}

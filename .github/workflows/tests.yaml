@@ -4,7 +4,7 @@ permissions:
   packages: write
   contents: read
   security-events: write
-  pull-requests: read
+  pull-requests: write
 
 jobs:
   docker-build:
@@ -19,5 +19,5 @@ jobs:
     with:
       name: '/test'
 
-  file-check:
-    uses: ./.github/workflows/file-check.yaml
+  lfs-warning:
+    uses: ./.github/workflows/lfs-warning.yaml
