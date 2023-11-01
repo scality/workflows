@@ -1,4 +1,4 @@
-on: push
+on: pull_request
 
 permissions:
   packages: write
@@ -17,3 +17,6 @@ jobs:
     uses: ./.github/workflows/trivy.yaml
     with:
       name: '/test'
+
+  file-check:
+    uses: ./.github/workflows/file-check.yaml

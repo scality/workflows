@@ -1,0 +1,38 @@
+---
+
+# This workflow is a reusable workflow meant to be called on pull_request events.
+# The goal is to check the files in the pull request to make sure they have the appropriate size and type.
+# - We shouldn't allow files larger than 1MB.
+# - We shouldn't allow merging binaries, tarballs, or other non-text files.
+
+name: file check
+
+on:
+  workflow_call:
+    inputs:
+      fetch-depth:
+        description: 'The number of commits included in the refspec for fetch'
+        required: false
+        default: 20
+        type: number
+
+permissions:
+  pull-requests: read
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Get changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v40
+      - name: Check files
+        run: ./scripts/file-check.sh "${{ steps.changed-files.outputs.all_changed_files }}"
+
+
+
+
+
+
+
