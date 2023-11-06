@@ -41,6 +41,7 @@ nav:
 - Home: index.md
 - Docker build: docker-build.md
 - Trivy: trivy.md
+- Git LFS warning: lfs-warning.md
 - Known issues: known-issues.md
 
 markdown_extensions:
