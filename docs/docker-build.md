@@ -20,7 +20,7 @@ Resulting in making the image available on:
 # my-workflow.yaml
 jobs:
   docker-build:
-    uses: scality/workflows/.github/workflows/docker-build.yaml@v1
+    uses: scality/workflows/.github/workflows/docker-build.yaml@v2
     with:
       name: my-image
 ```
@@ -31,7 +31,7 @@ To specify a private registry you can use the following inputs:
 # my-workflow.yaml
 jobs:
   docker-build:
-    uses: scality/workflows/.github/workflows/docker-build.yaml@v1
+    uses: scality/workflows/.github/workflows/docker-build.yaml@v2
     with:
       name: my-image
       registry: my.registry.com
