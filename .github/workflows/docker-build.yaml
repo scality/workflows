@@ -52,6 +52,9 @@ on:
         required: false
         type: boolean
         default: true
+      secrets:
+        required: false
+        type: string
     secrets:
       REGISTRY_LOGIN:
         required: false
@@ -94,3 +97,4 @@ jobs:
         no-cache: ${{ inputs.no-cache }}
         build-args: ${{ inputs.build-args }}
         file: ${{ env.FILE }}
+        secrets: ${{ inputs.secrets }}
