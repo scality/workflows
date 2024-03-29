@@ -12,6 +12,13 @@ jobs:
     with:
       context: tests/docker
       name: test
+  docker-build-with-secrets:
+    uses: ./.github/workflows/docker-build.yaml
+    with:
+      context: tests/docker
+      name: test
+      secrets: |
+        my_secret=toto
 
   trivy:
     needs: docker-build
