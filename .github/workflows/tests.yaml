@@ -19,6 +19,7 @@ jobs:
       name: test
       secrets: |
         my_secret=toto
+        my_other_secret=tata
 
   trivy:
     needs: docker-build
