@@ -6,6 +6,7 @@ permissions:
   security-events: write
   pull-requests: write
   attestations: write
+  id-token: write
 
 jobs:
   docker-build:
