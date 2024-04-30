@@ -111,3 +111,4 @@ jobs:
         subject-name: ${{ inputs.registry }}/${{ inputs.namespace }}/${{ inputs.name }}
         subject-digest: ${{ steps.push.outputs.digest }}
         push-to-registry: true
+
