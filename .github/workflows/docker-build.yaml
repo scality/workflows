@@ -86,6 +86,7 @@ jobs:
 
     - name: Build and push ${{ inputs.name }} image
       uses: docker/build-push-action@v5
+      id: push
       with:
         context: ${{ inputs.context }}
         provenance: ${{ inputs.provenance }}
@@ -98,3 +99,10 @@ jobs:
         build-args: ${{ inputs.build-args }}
         file: ${{ env.FILE }}
         secrets: ${{ inputs.secrets }}
+
+    - name: Attest image
+      uses: github-early-access/generate-build-provenance@main
+      with:
+        subject-name: ${{ inputs.registry }}/${{ inputs.namespace }}/${{ inputs.name }}
+        subject-digest: ${{ steps.push.outputs.digest }}
+        push-to-registry: true
