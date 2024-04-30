@@ -5,6 +5,7 @@ permissions:
   contents: read
   security-events: write
   pull-requests: write
+  attestations: write
 
 jobs:
   docker-build:
