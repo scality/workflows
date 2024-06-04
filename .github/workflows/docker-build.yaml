@@ -21,7 +21,7 @@ on:
         default: |
           git.repository=${{ github.repository }}
           git.commit-sha=${{ github.sha }}
-          org.opencontainers.image.source="https://github.com/${{ github.repository }}"
+          org.opencontainers.image.source=https://github.com/${{ github.repository }}
       registry:
         required: false
         type: string
