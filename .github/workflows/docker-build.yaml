@@ -21,7 +21,7 @@ on:
         default: |
           git.repository=${{ github.repository }}
           git.commit-sha=${{ github.sha }}
-          org.opencontainers.image.source="https://github.com/${{ github.repository }}"
+          org.opencontainers.image.source=https://github.com/${{ github.repository }}
       registry:
         required: false
         type: string
@@ -61,6 +61,10 @@ on:
       REGISTRY_PASSWORD:
         required: false
 
+permissions:
+  packages: write
+  contents: read
+
 jobs:
   build:
     env:
@@ -85,7 +89,7 @@ jobs:
         password: ${{ env.REGISTRY_PASSWORD }}
 
     - name: Build and push ${{ inputs.name }} image
-      uses: docker/build-push-action@v5
+      uses: docker/build-push-action@v6
       with:
         context: ${{ inputs.context }}
         provenance: ${{ inputs.provenance }}
