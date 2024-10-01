@@ -61,6 +61,10 @@ on:
       REGISTRY_PASSWORD:
         required: false
 
+permissions:
+  packages: write
+  contents: read
+
 jobs:
   build:
     env:
