@@ -20,6 +20,12 @@ jobs:
       secrets: |
         my_secret=toto
         my_other_secret=tata
+  docker-build-platforms:
+    uses: ./.github/workflows/docker-build.yaml
+    with:
+      context: tests/docker
+      name: test-platform
+      platforms: linux/amd64,linux/arm64
 
   trivy:
     needs: docker-build
