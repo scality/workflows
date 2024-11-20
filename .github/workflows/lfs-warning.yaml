@@ -32,7 +32,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: lfs warning
-        uses: ppremk/lfs-warning@v3.2
+        uses: ppremk/lfs-warning@v3.3
         with:
           filesizelimit: ${{ inputs.filesizelimit }}
           labelName: ${{ inputs.labelname }}
