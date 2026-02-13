@@ -1,0 +1,80 @@
+# .github/workflows/claude-reusable.yml
+name: Claude Code (Reusable)
+
+on:
+  workflow_call:
+    secrets:
+      ANTHROPIC_API_KEY:
+        required: true
+    inputs:
+      author_login:
+        type: string
+        required: true
+      author_association:
+        type: string
+        required: true
+      prompt:
+        type: string
+        default: ''
+      claude_args:
+        type: string
+        default: '--max-turns 15'
+      timeout:
+        type: number
+        default: 30
+
+permissions: {}
+
+jobs:
+  claude:
+    runs-on: ubuntu-latest
+    environment: claude-code
+
+    if: |
+      inputs.author_login != 'claude[bot]' &&
+      (
+        inputs.author_association == 'OWNER' ||
+        inputs.author_association == 'MEMBER'
+      )
+
+    permissions:
+      contents: read
+      pull-requests: write
+      issues: write
+      id-token: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Load default instructions if no CLAUDE.md exists
+        id: instructions
+        run: |
+          if [ -f "CLAUDE.md" ]; then
+            echo "source=repo"
+            echo "prompt<<EOF" >> "$GITHUB_OUTPUT"
+            echo "${{ inputs.prompt }}" >> "$GITHUB_OUTPUT"
+            echo "EOF" >> "$GITHUB_OUTPUT"
+          else
+            echo "source=org-default"
+            DEFAULT=$(curl -s \
+              -H "Authorization: token ${{ github.token }}" \
+              -H "Accept: application/vnd.github.raw" \
+              "https://api.github.com/repos/${{ github.repository_owner }}/.github/contents/CLAUDE.md")
+            echo "prompt<<EOF" >> "$GITHUB_OUTPUT"
+            printf '%s\n' "$DEFAULT" >> "$GITHUB_OUTPUT"
+            if [ -n "${{ inputs.prompt }}" ]; then
+              printf '\n%s\n' "${{ inputs.prompt }}" >> "$GITHUB_OUTPUT"
+            fi
+            echo "EOF" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Run Claude Code
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: ${{ steps.instructions.outputs.prompt }}
+          claude_args: ${{ inputs.claude_args }}
+        timeout-minutes: ${{ inputs.timeout }}
