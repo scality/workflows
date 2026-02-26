@@ -9,6 +9,12 @@ on:
       GCP_SERVICE_ACCOUNT:
         required: true
         description: GCP Service Account for Vertex AI
+      ANTHROPIC_VERTEX_PROJECT_ID:
+        required: true
+        description: GCP project ID for Vertex AI
+      CLOUD_ML_REGION:
+        required: true
+        description: GCP region for Vertex AI
 
 jobs:
   claude-review:
@@ -41,5 +47,5 @@ jobs:
             --allowedTools "Bash(git diff *)" "Bash(git log *)" "Bash(git show *)" "Bash(gh repo view *)" "Bash(gh pr view *)" "Bash(gh pr diff *)" "Bash(gh pr comment *)" "Bash(gh api *)"
             --model "claude-opus-4-6"
         env:
-          ANTHROPIC_VERTEX_PROJECT_ID: "claudecode-487808"
-          CLOUD_ML_REGION: "us-east5"
+          ANTHROPIC_VERTEX_PROJECT_ID: ${{ secrets.ANTHROPIC_VERTEX_PROJECT_ID }}
+          CLOUD_ML_REGION: ${{ secrets.CLOUD_ML_REGION }}
