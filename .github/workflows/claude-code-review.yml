@@ -1,0 +1,45 @@
+name: Claude Code Review
+
+on:
+  workflow_call:
+    secrets:
+      GCP_WORKLOAD_IDENTITY_PROVIDER:
+        required: true
+        description: GCP Workload Identity Provider for Vertex AI
+      GCP_SERVICE_ACCOUNT:
+        required: true
+        description: GCP Service Account for Vertex AI
+
+jobs:
+  claude-review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15  # adds cost protection
+    permissions:
+      contents: read
+      pull-requests: write
+      id-token: write  # claude-code-action needs this to authenticate with GitHub
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 1
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Run Claude Code Review
+        id: claude-review
+        continue-on-error: true
+        uses: anthropics/claude-code-action@v1
+        with:
+          use_vertex: "true"
+          prompt: "/review-pr REPO: ${{ github.repository }} PR_NUMBER: ${{ github.event.pull_request.number }}"
+          claude_args: |
+            --allowedTools "Bash(git diff *)" "Bash(git log *)" "Bash(git show *)" "Bash(gh repo view *)" "Bash(gh pr view *)" "Bash(gh pr diff *)" "Bash(gh pr comment *)" "Bash(gh api *)"
+            --model "claude-opus-4-6"
+        env:
+          ANTHROPIC_VERTEX_PROJECT_ID: "claudecode-487808"
+          CLOUD_ML_REGION: "us-east5"
