@@ -1,0 +1,98 @@
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: "Version bump type"
+        required: false
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+        default: patch
+  push:
+    branches:
+      - main
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      next_version: ${{ steps.next_version.outputs.next_version }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Calculate next version
+        id: next_version
+        env:
+          BUMP: ${{ inputs.bump || 'patch' }}
+        run: |
+          # Get the latest version tag
+          latest=$(git tag -l 'v[0-9]*.*.*' | sort -V | tail -1)
+          echo "Latest tag: $latest"
+
+          # Parse major.minor.patch
+          IFS='.' read -r major minor patch <<< "${latest#v}"
+
+          # Push to main always bumps patch; manual dispatch uses selected bump type
+          case "$BUMP" in
+            major)
+              major=$((major + 1))
+              minor=0
+              patch=0
+              ;;
+            minor)
+              minor=$((minor + 1))
+              patch=0
+              ;;
+            patch)
+              patch=$((patch + 1))
+              ;;
+          esac
+
+          next_version="v${major}.${minor}.${patch}"
+          echo "next_version=$next_version" >> $GITHUB_OUTPUT
+          echo "Next version: $next_version (bump: $BUMP)"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        with:
+          name: Release ${{ steps.next_version.outputs.next_version }}
+          tag_name: ${{ steps.next_version.outputs.next_version }}
+          generate_release_notes: true
+          target_commitish: ${{ github.sha }}
+
+  update-major-tag:
+    needs: create-release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Update major version tag
+        env:
+          NEXT_VERSION: ${{ needs.create-release.outputs.next_version }}
+        run: |
+          major_version=$(echo "$NEXT_VERSION" | cut -d. -f1)
+
+          git tag -f "$major_version"
+          git push origin "$major_version" --force
+
+          echo "Updated $major_version tag to point to $NEXT_VERSION"
