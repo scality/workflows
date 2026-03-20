@@ -37,7 +37,7 @@ jobs:
       - name: Configure git for private repositories
         run: |
           if [ -n "$GIT_ACCESS_TOKEN" ]; then
-            git config --global url."https://x-access-token:${GIT_ACCESS_TOKEN}@github.com/".insteadOf "https://github.com/"
+            git config --local url."https://x-access-token:${GIT_ACCESS_TOKEN}@github.com/".insteadOf "https://github.com/"
           fi
         env:
           GIT_ACCESS_TOKEN: ${{ secrets.GIT_ACCESS_TOKEN }}
@@ -46,7 +46,7 @@ jobs:
         id: install-deps
         if: hashFiles('yarn.lock') != ''
         continue-on-error: true
-        run: yarn install --frozen-lockfile
+        run: yarn install --frozen-lockfile --ignore-scripts
 
       - name: Warn on failed dependency install
         if: steps.install-deps.outcome == 'failure'
