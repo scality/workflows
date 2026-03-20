@@ -54,6 +54,7 @@ jobs:
         with:
           github_token: ${{ github.token }}
           use_vertex: "true"
+          allowed_bots: "dependabot[bot]"
           plugin_marketplaces: https://github.com/scality/agent-hub
           plugins: scality-skills@scality-agent-hub
           prompt: "/review-dependency-bump REPO: ${{ github.repository }} PR_NUMBER: ${{ github.event.pull_request.number }}"
