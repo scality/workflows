@@ -27,8 +27,6 @@ jobs:
       contents: read
       pull-requests: write
       id-token: write
-    env:
-      GIT_ACCESS_TOKEN: ${{ secrets.GIT_ACCESS_TOKEN }}
 
     steps:
       - uses: actions/checkout@v6
@@ -37,8 +35,12 @@ jobs:
           fetch-depth: 1
 
       - name: Configure git for private repositories
-        if: env.GIT_ACCESS_TOKEN != ''
-        run: git config --global url."https://x-access-token:${GIT_ACCESS_TOKEN}@github.com/".insteadOf "https://github.com/"
+        run: |
+          if [ -n "$GIT_ACCESS_TOKEN" ]; then
+            git config --global url."https://x-access-token:${GIT_ACCESS_TOKEN}@github.com/".insteadOf "https://github.com/"
+          fi
+        env:
+          GIT_ACCESS_TOKEN: ${{ secrets.GIT_ACCESS_TOKEN }}
 
       - name: Install dependencies
         id: install-deps
