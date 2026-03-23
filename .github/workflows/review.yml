@@ -3,10 +3,12 @@ name: Code Review
 on:
   pull_request:
     types: [opened, synchronize]
+  pull_request_target:
+    types: [opened, synchronize]
 
 jobs:
   review:
-    if: github.actor != 'dependabot[bot]'
+    if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]'
     uses: ./.github/workflows/claude-code-review.yml
     secrets:
       GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
@@ -15,10 +17,11 @@ jobs:
       CLOUD_ML_REGION: ${{ secrets.CLOUD_ML_REGION }}
 
   review-dependency-bump:
-    if: github.actor == 'dependabot[bot]'
-    uses: ./.github/workflows/claude-code-dependency-review.yml
+    if: github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]'
+    uses: scality/workflows/.github/workflows/claude-code-dependency-review.yml@feature/auth-as-claude-app
     secrets:
       GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
       GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
       ANTHROPIC_VERTEX_PROJECT_ID: ${{ secrets.ANTHROPIC_VERTEX_PROJECT_ID }}
       CLOUD_ML_REGION: ${{ secrets.CLOUD_ML_REGION }}
+      ACTIONS_APP_PRIVATE_KEY: ${{ secrets.ACTIONS_APP_PRIVATE_KEY }}
