@@ -18,7 +18,7 @@ jobs:
 
   review-dependency-bump:
     if: github.event_name == 'pull_request_target' && github.actor == 'dependabot[bot]'
-    uses: scality/workflows/.github/workflows/claude-code-dependency-review.yml@feature/auth-as-claude-app
+    uses: ./.github/workflows/claude-code-dependency-review.yml
     secrets:
       GCP_WORKLOAD_IDENTITY_PROVIDER: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
       GCP_SERVICE_ACCOUNT: ${{ secrets.GCP_SERVICE_ACCOUNT }}
