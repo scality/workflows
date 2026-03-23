@@ -73,6 +73,7 @@ jobs:
         uses: anthropics/claude-code-action@v1
         with:
           use_vertex: "true"
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           allowed_bots: "dependabot[bot]"
           plugin_marketplaces: https://github.com/scality/agent-hub.git
           plugins: scality-skills@scality-agent-hub
