@@ -27,7 +27,7 @@ jobs:
       contents: read
       pull-requests: write
       id-token: write
-      checks: read
+      actions: read
 
     steps:
       - uses: actions/checkout@v6
@@ -72,11 +72,14 @@ jobs:
         continue-on-error: true
         uses: anthropics/claude-code-action@v1
         with:
-          github_token: ${{ github.token }}
           use_vertex: "true"
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           allowed_bots: "dependabot[bot]"
           plugin_marketplaces: https://github.com/scality/agent-hub.git
           plugins: scality-skills@scality-agent-hub
+          # additional_permissions: |
+          #   actions: read
+          #   pull-requests: write
           prompt: "/review-dependency-bump REPO: ${{ github.repository }} PR_NUMBER: ${{ github.event.pull_request.number }}"
           claude_args: |
             --allowedTools "Read" "Grep" "WebFetch" "Bash(gh repo view *)" "Bash(gh pr view *)" "Bash(gh pr comment *)" "Bash(gh pr review *)" "Bash(gh api *)"
