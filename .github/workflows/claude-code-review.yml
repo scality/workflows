@@ -21,6 +21,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15  # adds cost protection
     permissions:
+      checks: write
       contents: read
       pull-requests: write
       id-token: write  # claude-code-action needs this to authenticate with GitHub
@@ -44,7 +45,7 @@ jobs:
           use_vertex: "true"
           prompt: "/review-pr REPO: ${{ github.repository }} PR_NUMBER: ${{ github.event.pull_request.number }}"
           claude_args: |
-            --allowedTools "Read" "Bash(git diff *)" "Bash(git log *)" "Bash(git show *)" "Bash(gh repo view *)" "Bash(gh pr view *)" "Bash(gh pr diff *)" "Bash(gh pr comment *)" "Bash(gh api *)"
+            --allowedTools "Read" "Bash(git diff *)" "Bash(git log *)" "Bash(git show *)" "Bash(gh repo view *)" "Bash(gh pr view *)" "Bash(gh pr diff *)" "Bash(gh pr comment *)" "Bash(gh api *)" "Bash(gh pr checks *)"
             --model "claude-opus-4-6"
         env:
           ANTHROPIC_VERTEX_PROJECT_ID: ${{ secrets.ANTHROPIC_VERTEX_PROJECT_ID }}
