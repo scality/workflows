@@ -2,6 +2,11 @@ name: Claude Code Review
 
 on:
   workflow_call:
+    inputs:
+      skip_label:
+        type: string
+        description: "If this label is set on the PR, the review will be skipped"
+        default: "skip-claude-review"
     secrets:
       GCP_WORKLOAD_IDENTITY_PROVIDER:
         required: true
@@ -18,6 +23,7 @@ on:
 
 jobs:
   claude-review:
+    if: ${{ !contains(github.event.pull_request.labels.*.name, inputs.skip_label) }}
     runs-on: ubuntu-latest
     timeout-minutes: 15  # adds cost protection
     permissions:
