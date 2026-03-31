@@ -15,6 +15,14 @@ on:
       CLOUD_ML_REGION:
         required: true
         description: GCP region for Vertex AI
+      ACTIONS_APP_PRIVATE_KEY:
+        required: false
+        description: Private key for the GitHub App used to access private repositories
+    inputs:
+      ACTIONS_APP_ID:
+        required: false
+        type: string
+        description: App ID for the GitHub App used to access private repositories
 
 jobs:
   dependency-review:
@@ -30,6 +38,22 @@ jobs:
         with:
           ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
+
+      - name: Generate token for private repositories
+        if: inputs.ACTIONS_APP_ID != ''
+        uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ inputs.ACTIONS_APP_ID }}
+          private-key: ${{ secrets.ACTIONS_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Configure git for private repositories
+        if: steps.app-token.outputs.token != ''
+        run: |
+          git config --global url."https://x-access-token:${GIT_ACCESS_TOKEN}@github.com/".insteadOf "https://github.com/"
+        env:
+          GIT_ACCESS_TOKEN: ${{ steps.app-token.outputs.token }}
 
       - name: Install dependencies
         id: install-deps
