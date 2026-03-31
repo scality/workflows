@@ -15,6 +15,19 @@ on:
       CLOUD_ML_REGION:
         required: true
         description: GCP region for Vertex AI
+      ACTIONS_APP_PRIVATE_KEY:
+        required: false
+        description: Private key for the GitHub App used to access private repositories
+    inputs:
+      ACTIONS_APP_ID:
+        required: false
+        type: string
+        description: App ID for the GitHub App used to access private repositories
+      node-version:
+        required: false
+        type: string
+        default: '22'
+        description: Node.js version to use for dependency installation
 
 jobs:
   dependency-review:
@@ -24,17 +37,42 @@ jobs:
       contents: read
       pull-requests: write
       id-token: write
+      checks: read
+      actions: read
 
     steps:
       - uses: actions/checkout@v6
         with:
+          ref: ${{ github.event.pull_request.head.sha }}
           fetch-depth: 1
+
+      - name: Generate token for private repositories
+        if: inputs.ACTIONS_APP_ID != ''
+        uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ inputs.ACTIONS_APP_ID }}
+          private-key: ${{ secrets.ACTIONS_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
+      - name: Configure git for private repositories
+        if: steps.app-token.outputs.token != ''
+        run: |
+          git config --global url."https://x-access-token:${GIT_ACCESS_TOKEN}@github.com/".insteadOf "https://github.com/"
+        env:
+          GIT_ACCESS_TOKEN: ${{ steps.app-token.outputs.token }}
+
+      - name: Set up Node.js
+        if: hashFiles('yarn.lock') != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
 
       - name: Install dependencies
         id: install-deps
         if: hashFiles('yarn.lock') != ''
         continue-on-error: true
-        run: yarn install --frozen-lockfile
+        run: yarn install --frozen-lockfile --ignore-scripts
 
       - name: Warn on failed dependency install
         if: steps.install-deps.outcome == 'failure'
@@ -53,7 +91,8 @@ jobs:
         with:
           github_token: ${{ github.token }}
           use_vertex: "true"
-          plugin_marketplaces: https://github.com/scality/agent-hub
+          allowed_bots: "dependabot[bot]"
+          plugin_marketplaces: https://github.com/scality/agent-hub.git
           plugins: scality-skills@scality-agent-hub
           prompt: "/review-dependency-bump REPO: ${{ github.repository }} PR_NUMBER: ${{ github.event.pull_request.number }}"
           claude_args: |
