@@ -23,6 +23,11 @@ on:
         required: false
         type: string
         description: App ID for the GitHub App used to access private repositories
+      node-version:
+        required: false
+        type: string
+        default: '22'
+        description: Node.js version to use for dependency installation
 
 jobs:
   dependency-review:
@@ -57,11 +62,17 @@ jobs:
         env:
           GIT_ACCESS_TOKEN: ${{ steps.app-token.outputs.token }}
 
+      - name: Set up Node.js
+        if: hashFiles('yarn.lock') != ''
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+
       - name: Install dependencies
         id: install-deps
         if: hashFiles('yarn.lock') != ''
         continue-on-error: true
-        run: yarn install --frozen-lockfile
+        run: yarn install --frozen-lockfile --ignore-scripts
 
       - name: Warn on failed dependency install
         if: steps.install-deps.outcome == 'failure'
