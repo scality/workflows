@@ -86,17 +86,17 @@ jobs:
       if: inputs.platforms
 
     - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      uses: docker/setup-buildx-action@v4
 
     - name: Login to ${{ inputs.registry }}
-      uses: docker/login-action@v3
+      uses: docker/login-action@v4
       with:
         registry: ${{ inputs.registry }}
         username: ${{ env.REGISTRY_LOGIN }}
         password: ${{ env.REGISTRY_PASSWORD }}
 
     - name: Build and push ${{ inputs.name }} image
-      uses: docker/build-push-action@v6
+      uses: docker/build-push-action@v7
       with:
         context: ${{ inputs.context }}
         provenance: ${{ inputs.provenance }}
