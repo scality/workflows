@@ -7,6 +7,10 @@ on:
         type: string
         description: "If this label is set on the PR, the review will be skipped"
         default: "skip-claude-review"
+      model:
+        type: string
+        description: Claude model to use for the review
+        default: claude-opus-4-6
     secrets:
       GCP_WORKLOAD_IDENTITY_PROVIDER:
         required: true
@@ -52,7 +56,7 @@ jobs:
           prompt: "/review-pr REPO: ${{ github.repository }} PR_NUMBER: ${{ github.event.pull_request.number }}"
           claude_args: |
             --allowedTools "Read" "Bash(git diff *)" "Bash(git log *)" "Bash(git show *)" "Bash(gh repo view *)" "Bash(gh pr view *)" "Bash(gh pr diff *)" "Bash(gh pr checks *)" "Bash(gh pr comment *)" "Bash(gh api *repos/*/pulls/*/comments*)" "Bash(gh api *issues/*/comments*)" "Bash(gh api *repos/*/check-runs*)"
-            --model "claude-opus-4-6"
+            --model "${{ inputs.model }}"
         env:
           ANTHROPIC_VERTEX_PROJECT_ID: ${{ secrets.ANTHROPIC_VERTEX_PROJECT_ID }}
           CLOUD_ML_REGION: ${{ secrets.CLOUD_ML_REGION }}
