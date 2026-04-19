@@ -15,6 +15,14 @@ on:
         type: string
         description: Comma-separated list of skills to use from the agent hub (e.g. scality-skills@scality-agent-hub)
         default: scality-skills@scality-agent-hub
+      summary-mode:
+        type: string
+        description: >
+          How the review output should be posted:
+          - check: post as a check run (requires checks: write permission)
+          - comment: post as a PR comment
+          - auto: check if allowed, otherwise post as a comment
+        default: auto
     secrets:
       GCP_WORKLOAD_IDENTITY_PROVIDER:
         required: true
@@ -63,6 +71,9 @@ jobs:
             --model "${{ inputs.model }}"
           plugin_marketplaces: scality/agent-hub
           plugins: ${{ inputs.plugins }}
+          additional_permissions: |
+            ${{ inputs.summary-mode != 'comment' && 'checks: write' || '' }}
         env:
           ANTHROPIC_VERTEX_PROJECT_ID: ${{ secrets.ANTHROPIC_VERTEX_PROJECT_ID }}
           CLOUD_ML_REGION: ${{ secrets.CLOUD_ML_REGION }}
+          PUBLISH_MODE: ${{ inputs.summary-mode }}
