@@ -15,6 +15,14 @@ on:
         type: string
         description: Comma-separated list of skills to use from the agent hub (e.g. scality-skills@scality-agent-hub)
         default: scality-skills@scality-agent-hub
+      plugin_marketplaces:
+        type: string
+        description: |
+          Marketplace to pull plugin from. Defaults to agent-hub, but possible to use another repo
+          or branch of the marketplace to pull the skills from (e.g. main):
+            https://github.com/scality/agent-hub.git#<my-branch>
+          Especially useful for testing a new version of a skill before it's merged to the default branch.
+        default: scality/agent-hub
       summary-mode:
         type: string
         description: >
@@ -23,6 +31,14 @@ on:
           - comment: post as a PR comment
           - auto: check if allowed, otherwise post as a comment
         default: auto
+      ACTIONS_APP_ID:
+        type: string
+        description: >
+          GitHub App ID used to generate a token for checking out marketplace
+          repositories at a specific branch. Required when any entry in
+          plugin_marketplaces uses the `<url>#<ref>` syntax.
+        required: false
+        default: ${{ vars.ACTIONS_APP_ID }}
     secrets:
       GCP_WORKLOAD_IDENTITY_PROVIDER:
         required: true
@@ -36,6 +52,9 @@ on:
       CLOUD_ML_REGION:
         required: true
         description: GCP region for Vertex AI
+      ACTIONS_APP_PRIVATE_KEY:
+        required: false
+        description: Private key of the GitHub App used to check out marketplace repositories
 
 jobs:
   claude-review:
@@ -53,6 +72,57 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Identify marketplaces needing local checkout
+        id: marketplaces
+        uses: actions/github-script@v7
+        env:
+          PLUGIN_MARKETPLACES: ${{ inputs.plugin_marketplaces }}
+        with:
+          script: |
+            // Entries using `<url>#<ref>` syntax are not supported natively by
+            // the claude-code plugin loader. Extract them so we can clone the
+            // repo locally and substitute the entry with the local path.
+            const entryPattern = /^(?:https?:\/\/github\.com\/)?([^/#]+)\/([^/#]+?)(?:\.git)?#(.+)$/;
+            const checkouts = [];
+            const marketplaces = (process.env.PLUGIN_MARKETPLACES || '').split(/[,\n]/).map(entry => {
+                const m = entry.trim().match(entryPattern);
+                if (!m) {
+                  return entry;
+                }
+
+              const [, owner, repo, ref] = m;
+              const path = `.marketplaces/${owner}-${repo}`;
+              checkouts.push({ repository: `${owner}/${repo}`, repo, ref, path });
+
+              return `./${path}`;
+            });
+            core.setOutput('checkouts', JSON.stringify(checkouts));
+            core.setOutput('repositories', checkouts.map(c => c.repo).join('\n'));
+            core.setOutput('marketplaces', marketplaces.join('\n'));
+
+      - name: Get token for marketplace repositories
+        if: steps.marketplaces.outputs.repositories != ''
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.ACTIONS_APP_ID }}
+          private-key: ${{ secrets.ACTIONS_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ steps.marketplaces.outputs.repositories }}
+
+      - name: Checkout marketplace repositories
+        if: steps.marketplaces.outputs.repositories != ''
+        env:
+          CHECKOUTS: ${{ steps.marketplaces.outputs.checkouts }}
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: |
+          jq -r '.[] | [.repository, .ref, .path] | @tsv' <<< "$CHECKOUTS" | while IFS=$'\t' read -r repo ref path; do
+            git clone --depth 1 --branch "$ref" "https://x-access-token:${GH_TOKEN}@github.com/${repo}.git" "$path"
+
+            # remove token from git config
+            git -C "$path" remote remove origin
+          done
+
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
@@ -69,7 +139,7 @@ jobs:
           claude_args: |
             --allowedTools "Read" "Bash(git diff *)" "Bash(git log *)" "Bash(git show *)" "Bash(gh repo view *)" "Bash(gh pr view *)" "Bash(gh pr diff *)" "Bash(gh pr checks *)" "Bash(gh pr comment *)" "Bash(gh api *repos/*/pulls/*/comments*)" "Bash(gh api *issues/*/comments*)" "Bash(gh api *repos/*/check-runs*)"
             --model "${{ inputs.model }}"
-          plugin_marketplaces: scality/agent-hub
+          plugin_marketplaces: ${{ steps.marketplaces.outputs.marketplaces }}
           plugins: ${{ inputs.plugins }}
           additional_permissions: |
             ${{ inputs.summary-mode != 'comment' && 'checks: write' || '' }}
