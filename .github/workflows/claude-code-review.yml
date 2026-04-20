@@ -31,14 +31,24 @@ on:
           - comment: post as a PR comment
           - auto: check if allowed, otherwise post as a comment
         default: auto
-      ACTIONS_APP_ID:
+      allowed-tools:
         type: string
         description: >
-          GitHub App ID used to generate a token for checking out marketplace
-          repositories at a specific branch. Required when any entry in
-          plugin_marketplaces uses the `<url>#<ref>` syntax.
-        required: false
-        default: ${{ vars.ACTIONS_APP_ID }}
+          Space-separated list of allowed tools for the review. By default, a set of safe tools is allowed, but you can customize this list to enable or disable specific tools based on your needs and risk tolerance.
+          NOTE: should not be needed if the skill already indicates the appropriate allowed tools. Keeping default value for compatibility.
+        default: >-
+          "Read"
+          "Bash(git diff *)"
+          "Bash(git log *)"
+          "Bash(git show *)"
+          "Bash(gh repo view *)"
+          "Bash(gh pr view *)"
+          "Bash(gh pr diff *)"
+          "Bash(gh pr checks *)"
+          "Bash(gh pr comment *)"
+          "Bash(gh api *repos/*/pulls/*/comments*)"
+          "Bash(gh api *issues/*/comments*)"
+          "Bash(gh api *repos/*/check-runs*)"
     secrets:
       GCP_WORKLOAD_IDENTITY_PROVIDER:
         required: true
@@ -137,7 +147,7 @@ jobs:
           use_vertex: "true"
           prompt: "/review-pr REPO: ${{ github.repository }} PR_NUMBER: ${{ github.event.pull_request.number }}"
           claude_args: |
-            --allowedTools "Read" "Bash(git diff *)" "Bash(git log *)" "Bash(git show *)" "Bash(gh repo view *)" "Bash(gh pr view *)" "Bash(gh pr diff *)" "Bash(gh pr checks *)" "Bash(gh pr comment *)" "Bash(gh api *repos/*/pulls/*/comments*)" "Bash(gh api *issues/*/comments*)" "Bash(gh api *repos/*/check-runs*)"
+            --allowedTools ${{ inputs.allowed-tools }}
             --model "${{ inputs.model }}"
           plugin_marketplaces: ${{ steps.marketplaces.outputs.marketplaces }}
           plugins: ${{ inputs.plugins }}
