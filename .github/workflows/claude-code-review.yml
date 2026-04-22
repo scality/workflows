@@ -87,8 +87,20 @@ jobs:
         uses: actions/github-script@v7
         env:
           PLUGIN_MARKETPLACES: ${{ inputs.plugin_marketplaces }}
+          PLUGINS: ${{ inputs.plugins }}
+          HAS_APP_KEY: ${{ secrets.ACTIONS_APP_PRIVATE_KEY != '' }}
         with:
           script: |
+            const hasAppKey = process.env.HAS_APP_KEY === 'true';
+            if (!hasAppKey) {
+              core.warning('ACTIONS_APP_PRIVATE_KEY secret is not set; skipping plugin marketplaces and plugins.');
+              core.setOutput('checkouts', '[]');
+              core.setOutput('repositories', '');
+              core.setOutput('marketplaces', '');
+              core.setOutput('plugins', '');
+              return;
+            }
+
             // Entries using `<url>#<ref>` syntax are not supported natively by
             // the claude-code plugin loader. Extract them so we can clone the
             // repo locally and substitute the entry with the local path.
@@ -106,9 +118,11 @@ jobs:
 
               return `./${path}`;
             });
+
             core.setOutput('checkouts', JSON.stringify(checkouts));
             core.setOutput('repositories', checkouts.map(c => c.repo).join('\n'));
             core.setOutput('marketplaces', marketplaces.join('\n'));
+            core.setOutput('plugins', process.env.PLUGINS || '');
 
       - name: Get token for marketplace repositories
         if: steps.marketplaces.outputs.repositories != ''
@@ -150,7 +164,7 @@ jobs:
             --allowedTools ${{ inputs.allowed-tools }}
             --model "${{ inputs.model }}"
           plugin_marketplaces: ${{ steps.marketplaces.outputs.marketplaces }}
-          plugins: ${{ inputs.plugins }}
+          plugins: ${{ steps.marketplaces.outputs.plugins }}
           additional_permissions: |
             ${{ inputs.summary-mode != 'comment' && 'checks: write' || '' }}
         env:
