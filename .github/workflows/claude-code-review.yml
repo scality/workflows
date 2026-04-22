@@ -22,7 +22,7 @@ on:
           or branch of the marketplace to pull the skills from (e.g. main):
             https://github.com/scality/agent-hub.git#<my-branch>
           Especially useful for testing a new version of a skill before it's merged to the default branch.
-        default: scality/agent-hub
+        default: https://github.com/scality/agent-hub.git
       summary-mode:
         type: string
         description: >
