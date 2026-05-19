@@ -171,3 +171,25 @@ jobs:
           ANTHROPIC_VERTEX_PROJECT_ID: ${{ secrets.ANTHROPIC_VERTEX_PROJECT_ID }}
           CLOUD_ML_REGION: ${{ secrets.CLOUD_ML_REGION }}
           PUBLISH_MODE: ${{ inputs.summary-mode }}
+
+      # Finalize the "Claude Code Review" check when the review job did not
+      # complete normally (action failure, runner timeout, cancellation).
+      # Without this the check sits at status=in_progress forever and blocks
+      # any branch protection that waits on it.
+      - name: Finalize stuck Claude Code Review check
+        if: always() && steps.claude-review.outcome != 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PUBLISH_MODE: ${{ inputs.summary-mode }}
+          OWNER_REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          script=$(ls .marketplaces/*/plugins/scality-skills/skills/review-pr/publish-summary.sh 2>/dev/null | head -1)
+          if [[ -z "${script}" ]]; then
+            echo "publish-summary.sh not found in any marketplace checkout — nothing to finalize" >&2
+            exit 0
+          fi
+          summary="Claude review job did not complete (action failure, timeout, or cancellation). See [workflow logs](${RUN_URL})."
+          "${script}" "${OWNER_REPO}" "${PR_NUMBER}" "${HEAD_SHA}" cancelled <<< "${summary}"
