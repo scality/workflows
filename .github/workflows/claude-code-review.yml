@@ -28,6 +28,9 @@ on:
         description: >
           How the review output should be posted:
           - check: post as a check run (requires checks: write permission)
+          - check_neutral: like check, but uses GitHub's non-blocking `neutral`
+            conclusion when issues are found, so the check does not shadow
+            real CI checks in the PR status rollup
           - comment: post as a PR comment
           - auto: check if allowed, otherwise post as a comment
         default: auto
@@ -171,3 +174,30 @@ jobs:
           ANTHROPIC_VERTEX_PROJECT_ID: ${{ secrets.ANTHROPIC_VERTEX_PROJECT_ID }}
           CLOUD_ML_REGION: ${{ secrets.CLOUD_ML_REGION }}
           PUBLISH_MODE: ${{ inputs.summary-mode }}
+
+      # Finalize the "Claude Code Review" check when the review job did not
+      # complete normally (action failure, runner timeout, cancellation).
+      # Without this the check sits at status=in_progress forever and blocks
+      # any branch protection that waits on it. PATCHes via gh api directly
+      # so the step has no coupling to the skill's helper script and is a
+      # natural no-op when no in-progress check exists (e.g. legacy skill).
+      - name: Finalize stuck Claude Code Review check
+        if: always() && steps.claude-review.outcome != 'success'
+        env:
+          OWNER_REPO: ${{ github.repository }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          check_id=$(gh api "repos/${OWNER_REPO}/commits/${HEAD_SHA}/check-runs" \
+            -f check_name="Claude Code Review" \
+            --jq '.check_runs[] | select(.status != "completed") | .id' | head -1)
+          if [[ -z "${check_id}" ]]; then
+            echo "No in-progress 'Claude Code Review' check on this SHA — nothing to finalize"
+            exit 0
+          fi
+          summary="Claude review job did not complete (action failure, timeout, or cancellation). See [workflow logs](${RUN_URL})."
+          jq -n --arg summary "${summary}" '{
+            status: "completed",
+            conclusion: "cancelled",
+            output: { title: "Claude Code Review: cancelled", summary: $summary }
+          }' | gh api "repos/${OWNER_REPO}/check-runs/${check_id}" --method PATCH --input -
