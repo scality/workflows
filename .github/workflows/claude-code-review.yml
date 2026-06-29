@@ -10,7 +10,7 @@ on:
       model:
         type: string
         description: Claude model to use for the review
-        default: claude-opus-4-6
+        default: claude-opus-4-8
       plugins:
         type: string
         description: Comma-separated list of skills to use from the agent hub (e.g. scality-skills@scality-agent-hub)
