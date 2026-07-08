@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Image Scan
         uses: aquasecurity/trivy-action@0.35.0
@@ -50,7 +50,7 @@ jobs:
           vuln-type: 'os,library'
 
       - name: Upload Trivy Image scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'trivy-image-results.sarif'
           category: 'image'
