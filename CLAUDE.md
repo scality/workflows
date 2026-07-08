@@ -19,6 +19,8 @@ This is **scality/workflows**, a repository of reusable GitHub Actions workflows
 | `docker-build.yaml` | Build and push Docker images with Buildx, caching, multi-platform support |
 | `trivy.yaml` | Container vulnerability scanning, uploads SARIF to GitHub Security tab |
 | `lfs-warning.yaml` | Validates file sizes in PRs, warns about files not tracked by Git LFS |
+| `release.yaml` | Computes the next semver off the last GA tag and pushes an annotated `v*` tag |
+| `promote.yaml` | Creates a GitHub Release from a pushed `v*` tag (pre-release on hyphenated tags) |
 | `claude-code-review.yml` | AI-powered PR review via Vertex AI |
 
 ## Conventions
