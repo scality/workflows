@@ -1,0 +1,147 @@
+---
+name: release
+
+on:
+  workflow_call:
+    inputs:
+      version-type:
+        description: "Version type: alpha, beta or GA"
+        required: true
+        type: string
+      version-scope:
+        description: "Version scope: patch, minor or major"
+        required: true
+        type: string
+      product-name:
+        description: >-
+          Optional human-readable product name prefixed to the tag annotation
+          message. When empty (default) the annotation is the tag alone.
+        required: false
+        type: string
+        default: ""
+      allowed-branch:
+        description: "Only ref allowed to cut releases"
+        required: false
+        type: string
+        default: main
+      actions-app-id:
+        description: >-
+          GitHub App ID used to push the tag (usually vars.ACTIONS_APP_ID).
+          Required unless dry-run is set.
+        required: false
+        type: string
+      dry-run:
+        description: "Compute and validate the tag without pushing it"
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      ACTIONS_APP_PRIVATE_KEY:
+        description: "Private key of the GitHub App. Required unless dry-run is set."
+        required: false
+    outputs:
+      tag:
+        description: "The release tag (e.g. v1.2.3 or v1.2.3-alpha.1)"
+        value: ${{ jobs.prepare-version.outputs.tag }}
+
+# The tag is created and pushed with the GitHub App token; the default
+# GITHUB_TOKEN only needs to read the repository.
+permissions:
+  contents: read
+
+jobs:
+  prepare-version:
+    runs-on: ubuntu-latest
+    if: github.ref_name == inputs.allowed-branch
+    outputs:
+      tag: ${{ steps.compose.outputs.tag }}
+    steps:
+      - name: Validate inputs
+        env:
+          VERSION_TYPE: ${{ inputs.version-type }}
+          VERSION_SCOPE: ${{ inputs.version-scope }}
+          APP_ID: ${{ inputs.actions-app-id }}
+          DRY_RUN: ${{ inputs.dry-run }}
+        run: |
+          case "$VERSION_TYPE" in
+            alpha|beta|GA) ;;
+            *) echo "::error::invalid version-type '$VERSION_TYPE' (expected alpha, beta or GA)"; exit 1 ;;
+          esac
+          case "$VERSION_SCOPE" in
+            patch|minor|major) ;;
+            *) echo "::error::invalid version-scope '$VERSION_SCOPE' (expected patch, minor or major)"; exit 1 ;;
+          esac
+          if [[ "$DRY_RUN" != "true" && -z "$APP_ID" ]]; then
+            echo "::error::actions-app-id is required unless dry-run is set"; exit 1
+          fi
+
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        # NOTE: The tag must be pushed with an App token: tags pushed with the
+        # default GITHUB_TOKEN do not trigger the `on: push: tags` workflows
+        # (e.g. promote.yaml) in the calling repository.
+        if: ${{ !inputs.dry-run }}
+        with:
+          app-id: ${{ inputs.actions-app-id }}
+          private-key: ${{ secrets.ACTIONS_APP_PRIVATE_KEY }}
+
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          token: ${{ steps.app-token.outputs.token || github.token }}
+
+      - name: Install semver tool
+        run: |
+          curl --fail -LO https://raw.githubusercontent.com/fsaintjacques/semver-tool/3.4.0/src/semver
+          chmod +x ./semver
+
+      - name: Compose release tag
+        id: compose
+        # `--merged HEAD` scopes tag selection to the current branch's history,
+        # and `--sort=version:refname` orders by semantic version (not creation
+        # date), so a hotfix tagged out of order on another release line can
+        # never be picked as the base version.
+        env:
+          VERSION_TYPE: ${{ inputs.version-type }}
+          VERSION_SCOPE: ${{ inputs.version-scope }}
+        run: |
+          # `|| true`: grep exits 1 when no GA tag matches (first release, or
+          # only pre-release tags); let the 0.0.0 fallback below handle it.
+          last_ga_tag=$(git tag --merged HEAD --sort=version:refname --list "v*" | { grep -v '\-' || true; } | tail -n 1)
+          if [[ -z "$last_ga_tag" ]]; then
+            last_ga_tag="0.0.0"
+          fi
+
+          new_version=$(./semver bump "$VERSION_SCOPE" "$last_ga_tag")
+
+          if [[ "$VERSION_TYPE" == "alpha" ]] || [[ "$VERSION_TYPE" == "beta" ]]; then
+            last_pre_tag=$(git tag --merged HEAD --sort=version:refname --list "v$new_version-$VERSION_TYPE.*" | tail -n 1)
+            if [[ -z "$last_pre_tag" ]]; then
+              new_version=$new_version-$VERSION_TYPE.1
+            else
+              new_version=$(./semver bump prerel "$last_pre_tag")
+            fi
+          fi
+
+          if [[ "${new_version:0:1}" != "v" ]]; then
+            new_version="v$new_version"
+          fi
+
+          echo "New version: $new_version"
+          echo "RELEASE_TAG=$new_version" >> "$GITHUB_ENV"
+          echo "tag=$new_version" >> "$GITHUB_OUTPUT"
+
+      - name: Validate ${{ env.RELEASE_TAG }} tag
+        run: ./semver validate "$RELEASE_TAG"
+
+      - name: Create and push `${{ env.RELEASE_TAG }}` tag
+        if: ${{ !inputs.dry-run }}
+        env:
+          PRODUCT_NAME: ${{ inputs.product-name }}
+        run: |
+          git config --global user.email ${{ github.actor }}@scality.com
+          git config --global user.name ${{ github.actor }}
+
+          git tag -a "$RELEASE_TAG" -m "${PRODUCT_NAME:+$PRODUCT_NAME }$RELEASE_TAG"
+          git push origin "$RELEASE_TAG"

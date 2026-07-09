@@ -1,0 +1,47 @@
+---
+name: promote
+
+on:
+  workflow_call:
+    inputs:
+      product-name:
+        description: >-
+          Optional human-readable product name prefixed to the release title.
+          When empty (default) the title is the tag alone (e.g. v1.2.3): the
+          repository already provides context in the GitHub UI. Set it for
+          monorepos or when the product name differs from the repo name
+          (e.g. "MetalK8s") to produce "MetalK8s v1.2.3".
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  create-release:
+    runs-on: ubuntu-latest
+    # Guard against a caller invoking this workflow outside a tag push
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      # Needed by action-gh-release to create the GitHub Release. The calling
+      # job must grant at least `contents: write` as well: a called workflow
+      # can only downgrade the caller's permissions, never elevate them.
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # NOTE: We explicitly set the refs otherwise the tag
+          # annotations content is not fetched
+          # See: https://github.com/actions/checkout/issues/882
+          ref: ${{ github.ref }}
+
+      - uses: softprops/action-gh-release@v3
+        with:
+          name: ${{ inputs.product-name && format('{0} {1}', inputs.product-name, github.ref_name) || github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          # We consider pre-releases if the tag contains a hyphen
+          # e.g. v1.2.3-alpha.0
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          draft: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

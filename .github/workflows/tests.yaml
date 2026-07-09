@@ -35,3 +35,26 @@ jobs:
 
   lfs-warning:
     uses: ./.github/workflows/lfs-warning.yaml
+
+  release-dry-run:
+    uses: ./.github/workflows/release.yaml
+    with:
+      version-type: alpha
+      version-scope: patch
+      # PR CI runs on a merge ref, not `main`; align the guard so the job runs
+      allowed-branch: ${{ github.ref_name }}
+      dry-run: true
+
+  release-dry-run-check:
+    needs: release-dry-run
+    runs-on: ubuntu-latest
+    steps:
+      - name: Assert a tag was computed
+        env:
+          TAG: ${{ needs.release-dry-run.outputs.tag }}
+        run: |
+          if [[ -z "$TAG" ]]; then
+            echo "::error::release dry-run produced an empty tag output"
+            exit 1
+          fi
+          echo "computed tag: $TAG"
