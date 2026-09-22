@@ -49,19 +49,23 @@ on:
           "Bash(gh api *repos/*/pulls/*/comments*)"
           "Bash(gh api *issues/*/comments*)"
           "Bash(gh api *repos/*/check-runs*)"
+      anthropic_federation_rule_id:
+        type: string
+        required: true
+        description: Anthropic federation rule ID (fdrl_...)
+      anthropic_organization_id:
+        type: string
+        required: true
+        description: Anthropic organization ID (UUID from Console → Settings → Organization)
+      anthropic_service_account_id:
+        type: string
+        required: true
+        description: Anthropic service account ID (svac_...)
+      anthropic_workspace_id:
+        type: string
+        required: true
+        description: Anthropic workspace ID (wrkspc_...)
     secrets:
-      GCP_WORKLOAD_IDENTITY_PROVIDER:
-        required: true
-        description: GCP Workload Identity Provider for Vertex AI
-      GCP_SERVICE_ACCOUNT:
-        required: true
-        description: GCP Service Account for Vertex AI
-      ANTHROPIC_VERTEX_PROJECT_ID:
-        required: true
-        description: GCP project ID for Vertex AI
-      CLOUD_ML_REGION:
-        required: true
-        description: GCP region for Vertex AI
       ACTIONS_APP_PRIVATE_KEY:
         required: false
         description: Private key of the GitHub App used to check out marketplace repositories
@@ -147,18 +151,17 @@ jobs:
             git -C "$path" remote remove origin
           done
 
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+      - name: Fetch Anthropic OIDC token
+        run: |
+          curl -sS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://api.anthropic.com" \
+            | jq -r .value > /tmp/anthropic-jwt
 
       - name: Run Claude Code Review
         id: claude-review
         continue-on-error: true
         uses: anthropics/claude-code-action@v1
         with:
-          use_vertex: "true"
           prompt: "/review-pr REPO: ${{ github.repository }} PR_NUMBER: ${{ github.event.pull_request.number }}"
           claude_args: |
             --allowedTools ${{ inputs.allowed-tools }}
@@ -168,6 +171,10 @@ jobs:
           additional_permissions: |
             ${{ inputs.summary-mode != 'comment' && 'checks: write' || '' }}
         env:
-          ANTHROPIC_VERTEX_PROJECT_ID: ${{ secrets.ANTHROPIC_VERTEX_PROJECT_ID }}
-          CLOUD_ML_REGION: ${{ secrets.CLOUD_ML_REGION }}
+          ANTHROPIC_FEDERATION_RULE_ID: ${{ inputs.anthropic_federation_rule_id }}
+          ANTHROPIC_ORGANIZATION_ID: ${{ inputs.anthropic_organization_id }}
+          ANTHROPIC_SERVICE_ACCOUNT_ID: ${{ inputs.anthropic_service_account_id }}
+          ANTHROPIC_WORKSPACE_ID: ${{ inputs.anthropic_workspace_id }}
+          ANTHROPIC_IDENTITY_TOKEN_FILE: /tmp/anthropic-jwt
+          ANTHROPIC_USER_ID: ${{ github.repository }}
           PUBLISH_MODE: ${{ inputs.summary-mode }}
