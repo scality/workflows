@@ -151,17 +151,15 @@ jobs:
             git -C "$path" remote remove origin
           done
 
-      - name: Fetch Anthropic OIDC token
-        run: |
-          curl -sS -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
-            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=https://api.anthropic.com" \
-            | jq -r .value > /tmp/anthropic-jwt
-
       - name: Run Claude Code Review
         id: claude-review
         continue-on-error: true
         uses: anthropics/claude-code-action@v1
         with:
+          anthropic_federation_rule_id: ${{ inputs.anthropic_federation_rule_id }}
+          anthropic_organization_id: ${{ inputs.anthropic_organization_id }}
+          anthropic_service_account_id: ${{ inputs.anthropic_service_account_id }}
+          anthropic_workspace_id: ${{ inputs.anthropic_workspace_id }}
           prompt: "/review-pr REPO: ${{ github.repository }} PR_NUMBER: ${{ github.event.pull_request.number }}"
           claude_args: |
             --allowedTools ${{ inputs.allowed-tools }}
@@ -171,10 +169,5 @@ jobs:
           additional_permissions: |
             ${{ inputs.summary-mode != 'comment' && 'checks: write' || '' }}
         env:
-          ANTHROPIC_FEDERATION_RULE_ID: ${{ inputs.anthropic_federation_rule_id }}
-          ANTHROPIC_ORGANIZATION_ID: ${{ inputs.anthropic_organization_id }}
-          ANTHROPIC_SERVICE_ACCOUNT_ID: ${{ inputs.anthropic_service_account_id }}
-          ANTHROPIC_WORKSPACE_ID: ${{ inputs.anthropic_workspace_id }}
-          ANTHROPIC_IDENTITY_TOKEN_FILE: /tmp/anthropic-jwt
           ANTHROPIC_USER_ID: ${{ github.repository }}
           PUBLISH_MODE: ${{ inputs.summary-mode }}
