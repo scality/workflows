@@ -31,24 +31,46 @@ on:
           - comment: post as a PR comment
           - auto: check if allowed, otherwise post as a comment
         default: auto
+      # Claude Code allows Read/Grep/Glob and read-only shell (cat, grep, git log...) on its own.
+      # `gh` needs a rule, and so does each stage of a pipeline: `a | b` is matched separately.
+      # Nothing listed reaches the network or runs the branch under review. Keep it that way.
       allowed-tools:
         type: string
         description: >
-          Space-separated list of allowed tools for the review. By default, a set of safe tools is allowed, but you can customize this list to enable or disable specific tools based on your needs and risk tolerance.
-          NOTE: should not be needed if the skill already indicates the appropriate allowed tools. Keeping default value for compatibility.
+          Space-separated list of allowed tools. Omit it to get the default below. A value passed
+          here REPLACES the default rather than extending it, so an empty string means no tools at
+          all — and the review still runs, sounding just as confident, on the diff alone.
+          NOTE: should not be needed if the skill already indicates the appropriate allowed tools.
         default: >-
           "Read"
+          "Grep"
+          "Glob"
           "Bash(git diff *)"
           "Bash(git log *)"
           "Bash(git show *)"
+          "Bash(git blame *)"
           "Bash(gh repo view *)"
           "Bash(gh pr view *)"
           "Bash(gh pr diff *)"
+          "Bash(gh pr list *)"
           "Bash(gh pr checks *)"
           "Bash(gh pr comment *)"
+          "Bash(gh issue view *)"
+          "Bash(gh run view *)"
+          "Bash(gh run list *)"
+          "Bash(gh search *)"
           "Bash(gh api *repos/*/pulls/*/comments*)"
+          "Bash(gh api *repos/*/pulls/*/files*)"
+          "Bash(gh api *repos/*/contents*)"
+          "Bash(gh api *repos/*/commits*)"
           "Bash(gh api *issues/*/comments*)"
           "Bash(gh api *repos/*/check-runs*)"
+          "Bash(jq *)"
+          "Bash(yq *)"
+          "Bash(cut *)"
+          "Bash(sort *)"
+          "Bash(uniq *)"
+          "Bash(tr *)"
     secrets:
       GCP_WORKLOAD_IDENTITY_PROVIDER:
         required: true
@@ -76,6 +98,7 @@ jobs:
       contents: read
       pull-requests: write
       id-token: write  # claude-code-action needs this to authenticate with GitHub
+      actions: read  # `gh run view --log` reads the Actions API
 
     steps:
       - uses: actions/checkout@v6
