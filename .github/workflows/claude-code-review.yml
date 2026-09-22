@@ -192,14 +192,14 @@ jobs:
         if: always() && steps.cost-token.conclusion == 'success'
         env:
           GH_TOKEN: ${{ steps.cost-token.outputs.token }}
-          CLAUDE_RESULT: ${{ steps.claude-review.outputs.result || '{}' }}
+          EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
           REPO: ${{ github.repository }}
           PR_NUMBER: ${{ github.event.pull_request.number || 0 }}
           RUN_ID: ${{ github.run_id }}
           MODEL: ${{ inputs.model }}
           COST_REPORT_REPO: ${{ github.repository_owner }}/${{ inputs.cost_report_repo }}
         run: |
-          cost=$(echo "$CLAUDE_RESULT" | jq -r '.total_cost_usd // 0' 2>/dev/null || echo "0")
+          cost=$(jq -r '.total_cost_usd // 0' "$EXECUTION_FILE" 2>/dev/null || echo "0")
           month=$(date -u +%Y-%m)
           file_path="cost-reports/cost-data-${month}.jsonl"
           new_line=$(jq -cn \
