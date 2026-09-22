@@ -65,6 +65,11 @@ on:
         type: string
         required: true
         description: Anthropic workspace ID (wrkspc_...)
+      cost_report_repo:
+        type: string
+        required: false
+        default: "plateform-eng-ci"
+        description: Repository (in the same org) where monthly cost reports are written
     secrets:
       ACTIONS_APP_PRIVATE_KEY:
         required: false
@@ -171,3 +176,55 @@ jobs:
         env:
           ANTHROPIC_USER_ID: ${{ github.repository }}
           PUBLISH_MODE: ${{ inputs.summary-mode }}
+
+      - name: Get token for cost reporting
+        id: cost-token
+        if: always() && vars.ACTIONS_APP_ID != '' && secrets.ACTIONS_APP_PRIVATE_KEY != ''
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.ACTIONS_APP_ID }}
+          private-key: ${{ secrets.ACTIONS_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ inputs.cost_report_repo }}
+
+      - name: Record cost in central report
+        if: always() && steps.cost-token.outputs.token != ''
+        env:
+          GH_TOKEN: ${{ steps.cost-token.outputs.token }}
+          CLAUDE_RESULT: ${{ steps.claude-review.outputs.result || '{}' }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number || 0 }}
+          RUN_ID: ${{ github.run_id }}
+          MODEL: ${{ inputs.model }}
+          COST_REPORT_REPO: ${{ github.repository_owner }}/${{ inputs.cost_report_repo }}
+        run: |
+          cost=$(echo "$CLAUDE_RESULT" | jq -r '.total_cost_usd // 0' 2>/dev/null || echo "0")
+          month=$(date -u +%Y-%m)
+          file_path="cost-reports/cost-data-${month}.jsonl"
+          new_line=$(jq -cn \
+            --arg repo "$REPO" \
+            --arg cost "${cost:-0}" \
+            --arg date "$(date -u +%Y-%m-%dT%H:%M:%SZ)" \
+            --arg model "$MODEL" \
+            --argjson pr "${PR_NUMBER}" \
+            --argjson run_id "${RUN_ID}" \
+            '{repo: $repo, pr: $pr, cost_usd: ($cost | tonumber), date: $date, run_id: $run_id, model: $model}')
+
+          for attempt in 1 2 3; do
+            api_response=$(gh api "repos/${COST_REPORT_REPO}/contents/${file_path}" 2>/dev/null || echo '{}')
+            sha=$(echo "$api_response" | jq -r '.sha // empty')
+            current_content=$(echo "$api_response" | jq -r '.content // ""' | tr -d '\n' | base64 --decode 2>/dev/null || true)
+            encoded_content=$(printf '%s' "${current_content}${new_line}"$'\n' | base64 -w 0)
+
+            put_args=(-X PUT \
+              -f "message=chore: claude review cost ${REPO} PR#${PR_NUMBER}" \
+              -f "content=${encoded_content}")
+            [ -n "$sha" ] && put_args+=(-f "sha=${sha}")
+
+            if gh api "repos/${COST_REPORT_REPO}/contents/${file_path}" "${put_args[@]}" > /dev/null 2>&1; then
+              echo "Cost recorded: ${cost} USD for ${REPO}"
+              break
+            fi
+            echo "Attempt $attempt failed (SHA conflict?), retrying..."
+            sleep $((attempt * 3))
+          done
