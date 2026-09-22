@@ -168,6 +168,7 @@ jobs:
           plugins: ${{ steps.marketplaces.outputs.plugins }}
           additional_permissions: |
             ${{ inputs.summary-mode != 'comment' && 'checks: write' || '' }}
+          show_full_output: "true"
         env:
           ANTHROPIC_USER_ID: ${{ github.repository }}
           PUBLISH_MODE: ${{ inputs.summary-mode }}
