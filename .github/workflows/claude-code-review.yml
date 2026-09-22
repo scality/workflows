@@ -199,7 +199,14 @@ jobs:
           MODEL: ${{ inputs.model }}
           COST_REPORT_REPO: ${{ github.repository_owner }}/${{ inputs.cost_report_repo }}
         run: |
-          cost=$(jq -r '.total_cost_usd // 0' "$EXECUTION_FILE" 2>/dev/null || echo "0")
+          # Try the step output path first, then search the filesystem as fallback
+          if [ -n "$EXECUTION_FILE" ] && [ -f "$EXECUTION_FILE" ]; then
+            cost=$(jq -r '.total_cost_usd // 0' "$EXECUTION_FILE" 2>/dev/null || echo "0")
+          else
+            exec_file=$(find /home/runner/work/_temp /tmp -name "*.json" -size +100c 2>/dev/null \
+              | xargs grep -l "total_cost_usd" 2>/dev/null | head -1)
+            cost=$(jq -r '.total_cost_usd // 0' "$exec_file" 2>/dev/null || echo "0")
+          fi
           month=$(date -u +%Y-%m)
           file_path="cost-reports/cost-data-${month}.jsonl"
           new_line=$(jq -cn \
