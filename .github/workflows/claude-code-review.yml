@@ -179,7 +179,8 @@ jobs:
 
       - name: Get token for cost reporting
         id: cost-token
-        if: always() && vars.ACTIONS_APP_ID != '' && secrets.ACTIONS_APP_PRIVATE_KEY != ''
+        if: always()
+        continue-on-error: true
         uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ vars.ACTIONS_APP_ID }}
@@ -188,7 +189,7 @@ jobs:
           repositories: ${{ inputs.cost_report_repo }}
 
       - name: Record cost in central report
-        if: always() && steps.cost-token.outputs.token != ''
+        if: always() && steps.cost-token.conclusion == 'success'
         env:
           GH_TOKEN: ${{ steps.cost-token.outputs.token }}
           CLAUDE_RESULT: ${{ steps.claude-review.outputs.result || '{}' }}
