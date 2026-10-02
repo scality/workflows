@@ -49,19 +49,45 @@ on:
           "Bash(gh api *repos/*/pulls/*/comments*)"
           "Bash(gh api *issues/*/comments*)"
           "Bash(gh api *repos/*/check-runs*)"
+      anthropic_federation_rule_id:
+        type: string
+        required: false
+        default: ${{ vars.ANTHROPIC_FEDERATION_RULE_ID }}
+        description: Anthropic federation rule ID (fdrl_...). Defaults to the ANTHROPIC_FEDERATION_RULE_ID org variable
+      anthropic_organization_id:
+        type: string
+        required: false
+        default: ${{ vars.ANTHROPIC_ORGANIZATION_ID }}
+        description: Anthropic organization ID (UUID from Console → Settings → Organization). Defaults to the ANTHROPIC_ORGANIZATION_ID org variable
+      anthropic_service_account_id:
+        type: string
+        required: false
+        default: ${{ vars.ANTHROPIC_SERVICE_ACCOUNT_ID }}
+        description: Anthropic service account ID (svac_...). Defaults to the ANTHROPIC_SERVICE_ACCOUNT_ID org variable
+      anthropic_workspace_id:
+        type: string
+        required: false
+        default: ${{ vars.ANTHROPIC_WORKSPACE_ID }}
+        description: Anthropic workspace ID (wrkspc_...). Defaults to the ANTHROPIC_WORKSPACE_ID org variable
+      cost_report_repo:
+        type: string
+        required: false
+        default: "cost-center-review"
+        description: Repository (in the same org) where monthly cost reports are written
     secrets:
+      # Deprecated: unused since the migration to Anthropic WIF, kept so callers passing them keep working
       GCP_WORKLOAD_IDENTITY_PROVIDER:
-        required: true
-        description: GCP Workload Identity Provider for Vertex AI
+        required: false
+        description: Deprecated, unused
       GCP_SERVICE_ACCOUNT:
-        required: true
-        description: GCP Service Account for Vertex AI
+        required: false
+        description: Deprecated, unused
       ANTHROPIC_VERTEX_PROJECT_ID:
-        required: true
-        description: GCP project ID for Vertex AI
+        required: false
+        description: Deprecated, unused
       CLOUD_ML_REGION:
-        required: true
-        description: GCP region for Vertex AI
+        required: false
+        description: Deprecated, unused
       ACTIONS_APP_PRIVATE_KEY:
         required: false
         description: Private key of the GitHub App used to check out marketplace repositories
@@ -92,8 +118,9 @@ jobs:
         with:
           script: |
             const hasAppKey = process.env.HAS_APP_KEY === 'true';
+            core.setOutput('has_app_key', String(hasAppKey));
             if (!hasAppKey) {
-              core.warning('ACTIONS_APP_PRIVATE_KEY secret is not set; skipping plugin marketplaces and plugins.');
+              core.warning('ACTIONS_APP_PRIVATE_KEY secret is not set; skipping plugin marketplaces, plugins and cost reporting.');
               core.setOutput('checkouts', '[]');
               core.setOutput('repositories', '');
               core.setOutput('marketplaces', '');
@@ -147,18 +174,15 @@ jobs:
             git -C "$path" remote remove origin
           done
 
-      - name: Authenticate to Google Cloud
-        uses: google-github-actions/auth@v2
-        with:
-          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
-          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
-
       - name: Run Claude Code Review
         id: claude-review
         continue-on-error: true
         uses: anthropics/claude-code-action@v1
         with:
-          use_vertex: "true"
+          anthropic_federation_rule_id: ${{ inputs.anthropic_federation_rule_id }}
+          anthropic_organization_id: ${{ inputs.anthropic_organization_id }}
+          anthropic_service_account_id: ${{ inputs.anthropic_service_account_id }}
+          anthropic_workspace_id: ${{ inputs.anthropic_workspace_id }}
           prompt: "/review-pr REPO: ${{ github.repository }} PR_NUMBER: ${{ github.event.pull_request.number }}"
           claude_args: |
             --allowedTools ${{ inputs.allowed-tools }}
@@ -168,6 +192,68 @@ jobs:
           additional_permissions: |
             ${{ inputs.summary-mode != 'comment' && 'checks: write' || '' }}
         env:
-          ANTHROPIC_VERTEX_PROJECT_ID: ${{ secrets.ANTHROPIC_VERTEX_PROJECT_ID }}
-          CLOUD_ML_REGION: ${{ secrets.CLOUD_ML_REGION }}
+          ANTHROPIC_USER_ID: ${{ github.repository }}
           PUBLISH_MODE: ${{ inputs.summary-mode }}
+
+      - name: Get token for cost reporting
+        id: cost-token
+        if: always() && steps.marketplaces.outputs.has_app_key == 'true'
+        continue-on-error: true
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ vars.ACTIONS_APP_ID }}
+          private-key: ${{ secrets.ACTIONS_APP_PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+          repositories: ${{ inputs.cost_report_repo }}
+
+      - name: Record cost in central report
+        if: always() && steps.cost-token.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ steps.cost-token.outputs.token }}
+          EXECUTION_FILE: ${{ steps.claude-review.outputs.execution_file }}
+          REPO: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number || 0 }}
+          MODEL: ${{ inputs.model }}
+          COST_REPORT_REPO: ${{ github.repository_owner }}/${{ inputs.cost_report_repo }}
+        run: |
+          # No execution file means Claude did not run (e.g. workflow validation skip)
+          if [ -z "$EXECUTION_FILE" ] || [ ! -f "$EXECUTION_FILE" ]; then
+            echo "No execution file, skipping cost report"
+            exit 0
+          fi
+          # The execution file is an array of SDK messages; the cost is on the final "result" message
+          cost=$(jq -r '[.[] | select(.type == "result")] | last | .total_cost_usd // 0' "$EXECUTION_FILE")
+          month=$(date -u +%Y-%m)
+          file_path="cost-reports/cost-data-${month}.json"
+          now=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          for attempt in 1 2 3; do
+            api_response=$(gh api "repos/${COST_REPORT_REPO}/contents/${file_path}" 2>/dev/null || echo '{}')
+            sha=$(echo "$api_response" | jq -r '.sha // empty')
+            current_content=$(echo "$api_response" | jq -r '.content // ""' | tr -d '\n' | base64 --decode 2>/dev/null || true)
+            # One entry per repo, accumulated over the month; costs rounded to the cent
+            encoded_content=$(printf '%s' "${current_content:-{\}}" | jq -S \
+              --arg repo "$REPO" \
+              --arg date "$now" \
+              --arg model "$MODEL" \
+              --argjson cost "${cost:-0}" \
+              '.[$repo] |= {
+                total_cost_usd: ((((.total_cost_usd // 0) + $cost) * 100 | round) / 100),
+                runs: ((.runs // 0) + 1),
+                last_run: $date,
+                model: $model
+              }' | base64 -w 0)
+
+            put_args=(-X PUT \
+              -f "message=chore: claude review cost ${REPO} PR#${PR_NUMBER}" \
+              -f "content=${encoded_content}")
+            [ -n "$sha" ] && put_args+=(-f "sha=${sha}")
+
+            if error=$(gh api "repos/${COST_REPORT_REPO}/contents/${file_path}" "${put_args[@]}" 2>&1 > /dev/null); then
+              echo "Cost recorded: $(jq -n --argjson c "$cost" '($c * 100 | round) / 100') USD for ${REPO}"
+              exit 0
+            fi
+            echo "Attempt $attempt failed: ${error}"
+            sleep $((attempt * 3))
+          done
+          echo "::warning::Could not record cost in ${COST_REPORT_REPO}: ${error}"
