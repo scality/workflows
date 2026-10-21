@@ -21,11 +21,12 @@ This is **scality/workflows**, a repository of reusable GitHub Actions workflows
 | `lfs-warning.yaml` | Validates file sizes in PRs, warns about files not tracked by Git LFS |
 | `release.yaml` | Computes the next semver off the last GA tag and pushes an annotated `v*` tag |
 | `promote.yaml` | Creates a GitHub Release from a pushed `v*` tag (pre-release on hyphenated tags) |
-| `claude-code-review.yml` | AI-powered PR review via Vertex AI |
+| `claude-code-review.yml` | AI-powered PR review via Anthropic API (Workload Identity Federation), reports costs to `cost-center-review` |
+| `claude-code-dependency-review.yml` | AI-powered review of Dependabot/Renovate bumps via Anthropic API (Workload Identity Federation), reports costs to `cost-center-review` |
 
 ## Conventions
 
-- Workflow files use `.yaml` extension (except `claude-code-review.yml`)
+- Workflow files use `.yaml` extension (except `claude-code-review.yml` and `claude-code-dependency-review.yml`)
 - All workflows use `workflow_call` trigger with typed `inputs` and `secrets`
 - Secrets have sensible defaults where possible (e.g., `GITHUB_TOKEN` for registry auth)
 - Actions are pinned to major version tags (e.g., `@v6`, `@v3`)
