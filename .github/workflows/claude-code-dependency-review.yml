@@ -23,7 +23,7 @@ on:
       ACTIONS_APP_ID:
         required: false
         type: string
-        description: App ID for the GitHub App used to access private repositories
+        description: App ID for the GitHub App used to access private repositories (including the agent-hub plugin marketplace). Defaults to the ACTIONS_APP_ID org variable
       node-version:
         required: false
         type: string
@@ -80,11 +80,11 @@ jobs:
           fetch-depth: 1
 
       - name: Generate token for private repositories
-        if: inputs.ACTIONS_APP_ID != ''
+        if: env.HAS_APP_KEY == 'true'
         uses: actions/create-github-app-token@v1
         id: app-token
         with:
-          app-id: ${{ inputs.ACTIONS_APP_ID }}
+          app-id: ${{ inputs.ACTIONS_APP_ID || vars.ACTIONS_APP_ID }}
           private-key: ${{ secrets.ACTIONS_APP_PRIVATE_KEY }}
           owner: ${{ github.repository_owner }}
 
