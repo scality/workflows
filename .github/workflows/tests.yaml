@@ -36,6 +36,11 @@ jobs:
   lfs-warning:
     uses: ./.github/workflows/lfs-warning.yaml
 
+  go-generated:
+    uses: ./.github/workflows/go-generated.yaml
+    with:
+      working-directory: tests/go-generated
+
   release-dry-run:
     uses: ./.github/workflows/release.yaml
     with:
