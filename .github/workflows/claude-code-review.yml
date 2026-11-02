@@ -101,9 +101,15 @@ jobs:
       checks: write
       contents: read
       pull-requests: write
-      id-token: write  # claude-code-action needs this to authenticate with GitHub
+      id-token: write  # OIDC token for the workload identity federation to the Anthropic API
 
     steps:
+      - name: Refuse to run on pull_request_target
+        if: github.event_name == 'pull_request_target'
+        run: |
+          echo "::error title=Unsupported event::claude-code-review must not run on pull_request_target: the job token has write permissions and the review reads untrusted PR content. Trigger it on pull_request."
+          exit 1
+
       - uses: actions/checkout@v6
         with:
           fetch-depth: 1
@@ -179,6 +185,10 @@ jobs:
         continue-on-error: true
         uses: anthropics/claude-code-action@v1
         with:
+          # Use the job token instead of the action's OIDC -> GitHub App token exchange:
+          # api.anthropic.com refuses `checks: write` in that exchange (401 permission_not_allowed).
+          # The job already holds `checks: write` (see permissions above).
+          github_token: ${{ github.token }}
           anthropic_federation_rule_id: ${{ inputs.anthropic_federation_rule_id }}
           anthropic_organization_id: ${{ inputs.anthropic_organization_id }}
           anthropic_service_account_id: ${{ inputs.anthropic_service_account_id }}
@@ -189,8 +199,6 @@ jobs:
             --model "${{ inputs.model }}"
           plugin_marketplaces: ${{ steps.marketplaces.outputs.marketplaces }}
           plugins: ${{ steps.marketplaces.outputs.plugins }}
-          additional_permissions: |
-            ${{ inputs.summary-mode != 'comment' && 'checks: write' || '' }}
         env:
           ANTHROPIC_USER_ID: ${{ github.repository }}
           PUBLISH_MODE: ${{ inputs.summary-mode }}
