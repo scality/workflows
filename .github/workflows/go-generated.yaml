@@ -1,0 +1,76 @@
+---
+
+# Reusable workflow for Go repositories, meant to be called on pull_request events.
+# It runs the commands that regenerate the code (go.sum, mocks, CRDs, ...) and fails
+# when the result differs from what is committed, so a PR cannot merge with stale
+# generated files. `git status --porcelain` also sees new untracked files.
+
+name: go-generated
+
+on:
+  workflow_call:
+    inputs:
+      commands:
+        description: 'Commands that regenerate the code, one per line'
+        required: false
+        default: |
+          go mod tidy
+          go generate ./...
+        type: string
+      working-directory:
+        description: 'Directory that holds the go.mod'
+        required: false
+        default: .
+        type: string
+      runs-on:
+        description: 'Runner label'
+        required: false
+        default: ubuntu-24.04
+        type: string
+    secrets:
+      GIT_ACCESS_TOKEN:
+        description: 'Token to fetch private github.com/scality modules'
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  go-generated:
+    runs-on: ${{ inputs.runs-on }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+      - name: Set up Go
+        uses: actions/setup-go@v7
+        with:
+          go-version-file: ${{ inputs.working-directory }}/go.mod
+          # The cache key comes from go.sum, which setup-go looks for at the repo root.
+          cache-dependency-path: ${{ inputs.working-directory }}/go.sum
+      - name: Configure private modules
+        # Tested in the script, not in `if`: GitHub only supports secrets in `if` through a
+        # job-level env, and this keeps the token scoped to the step that uses it.
+        env:
+          TOKEN: ${{ secrets.GIT_ACCESS_TOKEN }}
+        run: |
+          [ -n "$TOKEN" ] || exit 0
+          git config --global url."https://oauth2:${TOKEN}@github.com/scality".insteadOf "https://github.com/scality"
+          go env -w GOPRIVATE='github.com/scality/*'
+      - name: Regenerate
+        env:
+          COMMANDS: ${{ inputs.commands }}
+        run: bash -euo pipefail -c "$COMMANDS"
+      - name: Check that nothing changed
+        env:
+          COMMANDS: ${{ inputs.commands }}
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "::error::Generated files are not up to date. Run these commands and commit the result:"
+            echo "$COMMANDS"
+            git status --porcelain
+            git diff
+            exit 1
+          fi
