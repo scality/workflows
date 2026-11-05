@@ -48,11 +48,15 @@ jobs:
         uses: actions/setup-go@v7
         with:
           go-version-file: ${{ inputs.working-directory }}/go.mod
+          # The cache key comes from go.sum, which setup-go looks for at the repo root.
+          cache-dependency-path: ${{ inputs.working-directory }}/go.sum
       - name: Configure private modules
+        # Tested in the script, not in `if`: GitHub only supports secrets in `if` through a
+        # job-level env, and this keeps the token scoped to the step that uses it.
         env:
           TOKEN: ${{ secrets.GIT_ACCESS_TOKEN }}
-        if: env.TOKEN != ''
         run: |
+          [ -n "$TOKEN" ] || exit 0
           git config --global url."https://oauth2:${TOKEN}@github.com/scality".insteadOf "https://github.com/scality"
           go env -w GOPRIVATE='github.com/scality/*'
       - name: Regenerate
