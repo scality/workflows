@@ -38,8 +38,13 @@ jobs:
 
   go-generated:
     uses: ./.github/workflows/go-generated.yaml
+    # Push mode only pushes on a renovate/* branch: here it checks the inputs and the
+    # condition, and stays a plain check.
+    secrets: inherit
     with:
       working-directory: tests/go-generated
+      push-to-renovate-branches: true
+      actions-app-id: ${{ vars.ACTIONS_APP_ID }}
 
   release-dry-run:
     uses: ./.github/workflows/release.yaml

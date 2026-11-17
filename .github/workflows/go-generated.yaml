@@ -4,6 +4,7 @@
 # It runs the commands that regenerate the code (go.sum, mocks, CRDs, ...) and fails
 # when the result differs from what is committed, so a PR cannot merge with stale
 # generated files. `git status --porcelain` also sees new untracked files.
+# On a Renovate branch, it can also push the regenerated code (push-to-renovate-branches).
 
 name: go-generated
 
@@ -27,9 +28,22 @@ on:
         required: false
         default: ubuntu-24.04
         type: string
+      push-to-renovate-branches:
+        description: 'On a renovate/* branch of this repository, push the regenerated code instead of only failing'
+        required: false
+        default: false
+        type: boolean
+      actions-app-id:
+        description: 'GitHub App ID used to push the regenerated code (usually vars.ACTIONS_APP_ID)'
+        required: false
+        default: ''
+        type: string
     secrets:
       GIT_ACCESS_TOKEN:
         description: 'Token to fetch private github.com/scality modules'
+        required: false
+      ACTIONS_APP_PRIVATE_KEY:
+        description: 'Private key of the GitHub App, required with push-to-renovate-branches'
         required: false
 
 permissions:
@@ -38,15 +52,37 @@ permissions:
 jobs:
   go-generated:
     runs-on: ${{ inputs.runs-on }}
+    outputs:
+      patch: ${{ steps.patch.outputs.patch }}
+      artifact: ${{ steps.patch.outputs.artifact }}
+    env:
+      # Push mode: a renovate/* branch of this repository, never a fork.
+      RENOVATE_PUSH: >-
+        ${{ inputs.push-to-renovate-branches && github.event_name == 'pull_request'
+        && startsWith(github.head_ref, 'renovate/')
+        && github.event.pull_request.head.repo.full_name == github.repository }}
     defaults:
       run:
         working-directory: ${{ inputs.working-directory }}
     steps:
+      # On every PR, so a caller learns about a missing App config before a Renovate PR needs it.
+      - name: Validate inputs
+        if: inputs.push-to-renovate-branches
+        working-directory: ${{ github.workspace }}
+        env:
+          APP_ID: ${{ inputs.actions-app-id }}
+          HAS_KEY: ${{ secrets.ACTIONS_APP_PRIVATE_KEY != '' }}
+        run: |
+          if [ -z "$APP_ID" ] || [ "$HAS_KEY" != "true" ]; then
+            echo "::error::push-to-renovate-branches needs actions-app-id and the ACTIONS_APP_PRIVATE_KEY secret"
+            exit 1
+          fi
       - name: Checkout
         uses: actions/checkout@v7
         with:
           # The commands run repo code: keep the job token out of .git/config.
           persist-credentials: false
+          ref: ${{ env.RENOVATE_PUSH == 'true' && github.event.pull_request.head.sha || '' }}
       - name: Set up Go
         uses: actions/setup-go@v7
         with:
@@ -67,6 +103,32 @@ jobs:
         env:
           COMMANDS: ${{ inputs.commands }}
         run: bash -euo pipefail -c "$COMMANDS"
+      # See "Renovate branches" in docs/go-generated.md for the design of the push.
+      - name: Save the regenerated code for the Renovate branch
+        id: patch
+        if: env.RENOVATE_PUSH == 'true'
+        run: |
+          outside=$(git status --porcelain -- ':/' ':!.')
+          if [ -n "$outside" ]; then
+            echo "::error::The commands changed files outside working-directory, nothing is pushed:"
+            echo "$outside"
+            exit 1
+          fi
+          git add -A .
+          git diff --cached --binary > "$RUNNER_TEMP/regenerated.patch"
+          if [ -s "$RUNNER_TEMP/regenerated.patch" ]; then
+            echo "patch=true" >> "$GITHUB_OUTPUT"
+            # Unique per call: a caller may run this workflow once per module in one run.
+            echo "artifact=go-generated-patch-${GITHUB_JOB}-$(date +%s%N)" >> "$GITHUB_OUTPUT"
+          fi
+          git reset -q
+      - name: Upload the regenerated code
+        if: steps.patch.outputs.patch == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ steps.patch.outputs.artifact }}
+          path: ${{ runner.temp }}/regenerated.patch
+          retention-days: 1
       - name: Check that nothing changed
         env:
           COMMANDS: ${{ inputs.commands }}
@@ -78,3 +140,65 @@ jobs:
             git diff
             exit 1
           fi
+
+  push-to-renovate-branch:
+    needs: go-generated
+    # The check above fails on purpose: the pushed commit starts a new run, which passes.
+    if: ${{ !cancelled() && needs.go-generated.outputs.patch == 'true' }}
+    # Not inputs.runs-on: this job holds a write token, so it gets a fresh GitHub-hosted VM.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          app-id: ${{ inputs.actions-app-id }}
+          private-key: ${{ secrets.ACTIONS_APP_PRIVATE_KEY }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          token: ${{ steps.app-token.outputs.token }}
+          # The loop guard reads every commit of the branch since the base.
+          fetch-depth: 0
+      - name: Download the regenerated code
+        uses: actions/download-artifact@v7
+        with:
+          name: ${{ needs.go-generated.outputs.artifact }}
+          path: ${{ runner.temp }}
+      - name: Commit and push
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          BASE_REF: ${{ github.base_ref }}
+          HEAD_REF: ${{ github.head_ref }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          user_id=$(gh api "/users/${APP_SLUG}%5Bbot%5D" --jq .id)
+          email="${user_id}+${APP_SLUG}[bot]@users.noreply.github.com"
+          git apply --index "$RUNNER_TEMP/regenerated.patch"
+          # --no-renames: a move out of .github/ must show its old path too.
+          if git diff --cached --name-only --no-renames -z | grep -qz '^\.github/'; then
+            echo "::error::The regenerated code changes .github/, it is not pushed."
+            exit 1
+          fi
+          # Loop guard: files this App already regenerated on the branch, all modules together.
+          base=$(git merge-base HEAD "origin/${BASE_REF}")
+          done_files=$(git log --format='%H %ae' "${base}..HEAD" | awk -v e="$email" '$2 == e {print $1}' |
+            xargs -r -n1 git show --name-only --no-renames --format= | sort -u)
+          # In a variable: `| grep -q` can stop comm early, and pipefail then hides the match.
+          again=$(comm -12 <(git diff --cached --name-only --no-renames | sort) <(echo "$done_files"))
+          if [ -n "$again" ]; then
+            echo "::error::These files were already regenerated on this branch and still differ:"
+            echo "$again"
+            exit 1
+          fi
+          git -c core.hooksPath=/dev/null -c user.name="${APP_SLUG}[bot]" -c user.email="$email" \
+            commit -q -m "chore(deps): regenerate the code"
+          if [ "$(git ls-remote origin "refs/heads/${HEAD_REF}" | cut -f1)" != "$HEAD_SHA" ]; then
+            echo "::notice::${HEAD_REF} moved since this run started, nothing pushed."
+            exit 0
+          fi
+          git -c core.hooksPath=/dev/null push origin "HEAD:refs/heads/${HEAD_REF}"
+          echo "Pushed as ${APP_SLUG}[bot] <${email}>. Add this email to gitIgnoredAuthors in the Renovate config." >> "$GITHUB_STEP_SUMMARY"
