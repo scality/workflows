@@ -49,27 +49,22 @@ on:
 permissions:
   contents: read
 
+env:
+  # Push mode: a renovate/* branch of this repository, never a fork.
+  RENOVATE_PUSH: >-
+    ${{ inputs.push-to-renovate-branches && github.event_name == 'pull_request'
+    && startsWith(github.head_ref, 'renovate/')
+    && github.event.pull_request.head.repo.full_name == github.repository }}
+
 jobs:
-  go-generated:
-    runs-on: ${{ inputs.runs-on }}
-    outputs:
-      patch: ${{ steps.patch.outputs.patch }}
-      artifact: ${{ steps.patch.outputs.artifact }}
-    env:
-      # Push mode: a renovate/* branch of this repository, never a fork.
-      RENOVATE_PUSH: >-
-        ${{ inputs.push-to-renovate-branches && github.event_name == 'pull_request'
-        && startsWith(github.head_ref, 'renovate/')
-        && github.event.pull_request.head.repo.full_name == github.repository }}
-    defaults:
-      run:
-        working-directory: ${{ inputs.working-directory }}
+  # A job of its own: it reads the App key, so it must not run with the generators.
+  # An error only when a push is due. Elsewhere a warning, so a caller sees a missing App
+  # config early, while PRs that get no Actions secrets (Dependabot, forks) stay green.
+  validate-push-inputs:
+    if: inputs.push-to-renovate-branches
+    runs-on: ubuntu-24.04
     steps:
-      # An error only when a push is due. Elsewhere a warning, so a caller sees a missing App
-      # config early, while PRs that get no Actions secrets (Dependabot, forks) stay green.
       - name: Validate inputs
-        if: inputs.push-to-renovate-branches
-        working-directory: ${{ github.workspace }}
         env:
           APP_ID: ${{ inputs.actions-app-id }}
           HAS_KEY: ${{ secrets.ACTIONS_APP_PRIVATE_KEY != '' }}
@@ -79,6 +74,16 @@ jobs:
             if [ "$RENOVATE_PUSH" = "true" ]; then echo "::error::$msg"; exit 1; fi
             echo "::warning::$msg"
           fi
+
+  go-generated:
+    runs-on: ${{ inputs.runs-on }}
+    outputs:
+      patch: ${{ steps.patch.outputs.patch }}
+      artifact: ${{ steps.patch.outputs.artifact }}
+    defaults:
+      run:
+        working-directory: ${{ inputs.working-directory }}
+    steps:
       - name: Checkout
         uses: actions/checkout@v7
         with:
@@ -181,8 +186,10 @@ jobs:
           user_id=$(gh api "/users/${APP_SLUG}%5Bbot%5D" --jq .id)
           email="${user_id}+${APP_SLUG}[bot]@users.noreply.github.com"
           git apply --index "$RUNNER_TEMP/regenerated.patch"
-          # --no-renames: a move out of .github/ must show its old path too.
-          if git diff --cached --name-only --no-renames -z | grep -qz '^\.github/'; then
+          # --no-renames: a move out of .github/ must show its old path too. In a variable:
+          # `| grep -q` can stop git diff early, and pipefail then hides the match.
+          names=$(git diff --cached --name-only --no-renames -z | tr '\0' '\n')
+          if printf '%s\n' "$names" | awk 'index($0, ".github/") == 1 {found=1} END {exit !found}'; then
             echo "::error::The regenerated code changes .github/, it is not pushed."
             exit 1
           fi
