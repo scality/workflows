@@ -151,7 +151,13 @@ jobs:
   push-to-renovate-branch:
     needs: go-generated
     # The check above fails on purpose: the pushed commit starts a new run, which passes.
-    if: ${{ !cancelled() && needs.go-generated.outputs.patch == 'true' }}
+    # The branch condition again, not only the output of the job that ran the generators:
+    # they can write to $GITHUB_ENV there. A job-level `if` cannot read env, so it is inlined.
+    if: >-
+      ${{ !cancelled() && needs.go-generated.outputs.patch == 'true'
+      && inputs.push-to-renovate-branches && github.event_name == 'pull_request'
+      && startsWith(github.head_ref, 'renovate/')
+      && github.event.pull_request.head.repo.full_name == github.repository }}
     # Not inputs.runs-on: this job holds a write token, so it gets a fresh GitHub-hosted VM.
     runs-on: ubuntu-24.04
     steps:
