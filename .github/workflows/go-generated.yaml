@@ -224,9 +224,13 @@ jobs:
           fi
           git -c core.hooksPath=/dev/null -c user.name="${APP_SLUG}[bot]" -c user.email="$email" \
             commit -q -m "chore(deps): regenerate the code"
-          if [ "$(git ls-remote origin "refs/heads/${HEAD_REF}" | cut -f1)" != "$HEAD_SHA" ]; then
-            echo "::notice::${HEAD_REF} moved since this run started, nothing pushed."
-            exit 0
+          # Not forced: when the branch moved (Renovate, or another module's push job),
+          # the push is rejected and the new commit starts its own run.
+          if ! git -c core.hooksPath=/dev/null push origin "HEAD:refs/heads/${HEAD_REF}"; then
+            if [ "$(git ls-remote origin "refs/heads/${HEAD_REF}" | cut -f1)" != "$HEAD_SHA" ]; then
+              echo "::notice::${HEAD_REF} moved since this run started, nothing pushed."
+              exit 0
+            fi
+            exit 1
           fi
-          git -c core.hooksPath=/dev/null push origin "HEAD:refs/heads/${HEAD_REF}"
           echo "Pushed as ${APP_SLUG}[bot] <${email}>. Add this email to gitIgnoredAuthors in the Renovate config." >> "$GITHUB_STEP_SUMMARY"
