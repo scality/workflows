@@ -67,7 +67,8 @@ How it stays safe:
 - The pushed commit only holds changes under `working-directory`, never under `.github/`.
   When the commands change files outside `working-directory`, nothing is pushed. The push
   job checks this again, since the first job ran the generators.
-  Several calls, one per module, each push their own commit.
+  With one call per module, each run pushes one module: the first push moves the branch,
+  the other calls push nothing, and the next run regenerates the remaining modules.
 - It does not loop: when files the App already regenerated on the branch still differ,
   the job fails instead of pushing again.
 - The push job runs on a fresh GitHub-hosted runner, whatever `runs-on` says: it holds a
