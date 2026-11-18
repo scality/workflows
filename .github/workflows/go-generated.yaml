@@ -55,7 +55,8 @@ jobs:
           cache-dependency-path: ${{ inputs.working-directory }}/go.sum
       - name: Configure private modules
         # Tested in the script, not in `if`: GitHub only supports secrets in `if` through a
-        # job-level env, and this keeps the token scoped to the step that uses it.
+        # job-level env. The global git config keeps the token for the next steps, which
+        # run the commands: pass a read-only token.
         env:
           TOKEN: ${{ secrets.GIT_ACCESS_TOKEN }}
         run: |

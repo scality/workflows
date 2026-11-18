@@ -48,4 +48,4 @@ updated like any other dependency.
 
 | Name               | Description                                                        |
 | ------------------ | ------------------------------------------------------------------ |
-| `GIT_ACCESS_TOKEN` | Optional, to fetch private `github.com/scality` modules            |
+| `GIT_ACCESS_TOKEN` | Optional, to fetch private `github.com/scality` modules. The commands can read it: use a read-only token |
