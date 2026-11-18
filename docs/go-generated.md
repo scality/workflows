@@ -60,7 +60,8 @@ How it stays safe:
   `GITHUB_TOKEN` starts no workflow, so the required checks would never run.
 - It only runs on a `renovate/*` branch of the repository, never on a fork.
 - The pushed commit only holds changes under `working-directory`, never under `.github/`.
-  When the commands change files outside `working-directory`, nothing is pushed.
+  When the commands change files outside `working-directory`, nothing is pushed. The push
+  job checks this again, since the first job ran the generators.
   Several calls, one per module, each push their own commit.
 - It does not loop: when files the App already regenerated on the branch still differ,
   the job fails instead of pushing again.
@@ -77,8 +78,9 @@ Limits:
   there, so keep these PRs under human review: do not automerge a PR that holds a
   regeneration commit.
 
-The inputs are checked on every PR, so a missing App ID or key shows up before a
-Renovate PR needs it.
+The inputs are checked on every PR: a missing App ID or key fails the run when a push
+is due, and only warns otherwise, so PRs that get no Actions secrets (Dependabot, forks)
+stay green.
 
 The commit author is the GitHub App. Add its email, printed in the run summary, to
 `gitIgnoredAuthors` in the Renovate config: otherwise Renovate sees a foreign commit and

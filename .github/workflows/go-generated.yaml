@@ -65,7 +65,8 @@ jobs:
       run:
         working-directory: ${{ inputs.working-directory }}
     steps:
-      # On every PR, so a caller learns about a missing App config before a Renovate PR needs it.
+      # An error only when a push is due. Elsewhere a warning, so a caller sees a missing App
+      # config early, while PRs that get no Actions secrets (Dependabot, forks) stay green.
       - name: Validate inputs
         if: inputs.push-to-renovate-branches
         working-directory: ${{ github.workspace }}
@@ -74,8 +75,9 @@ jobs:
           HAS_KEY: ${{ secrets.ACTIONS_APP_PRIVATE_KEY != '' }}
         run: |
           if [ -z "$APP_ID" ] || [ "$HAS_KEY" != "true" ]; then
-            echo "::error::push-to-renovate-branches needs actions-app-id and the ACTIONS_APP_PRIVATE_KEY secret"
-            exit 1
+            msg="push-to-renovate-branches needs actions-app-id and the ACTIONS_APP_PRIVATE_KEY secret"
+            if [ "$RENOVATE_PUSH" = "true" ]; then echo "::error::$msg"; exit 1; fi
+            echo "::warning::$msg"
           fi
       - name: Checkout
         uses: actions/checkout@v7
@@ -173,6 +175,7 @@ jobs:
           APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
           BASE_REF: ${{ github.base_ref }}
           HEAD_REF: ${{ github.head_ref }}
+          WORKING_DIRECTORY: ${{ inputs.working-directory }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           user_id=$(gh api "/users/${APP_SLUG}%5Bbot%5D" --jq .id)
@@ -182,6 +185,18 @@ jobs:
           if git diff --cached --name-only --no-renames -z | grep -qz '^\.github/'; then
             echo "::error::The regenerated code changes .github/, it is not pushed."
             exit 1
+          fi
+          # Checked again here: the first job ran the generators, which could fake its checks.
+          dir="${WORKING_DIRECTORY#./}"; dir="${dir%/}"
+          if [ -n "$dir" ] && [ "$dir" != "." ]; then
+            # A literal prefix, not a regex: a "." in working-directory must not match any char.
+            outside=$(git diff --cached --name-only --no-renames -z | tr '\0' '\n' |
+              awk -v p="${dir}/" 'index($0, p) != 1')
+            if [ -n "$outside" ]; then
+              echo "::error::The patch changes files outside ${dir}/, it is not pushed:"
+              echo "$outside"
+              exit 1
+            fi
           fi
           # Loop guard: files this App already regenerated on the branch, all modules together.
           base=$(git merge-base HEAD "origin/${BASE_REF}")
