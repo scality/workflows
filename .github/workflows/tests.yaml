@@ -40,7 +40,8 @@ jobs:
     uses: ./.github/workflows/go-generated.yaml
     # Push mode only pushes on a renovate/* branch: here it checks the inputs and the
     # condition, and stays a plain check.
-    secrets: inherit
+    secrets:
+      ACTIONS_APP_PRIVATE_KEY: ${{ secrets.ACTIONS_APP_PRIVATE_KEY }}
     with:
       working-directory: tests/go-generated
       push-to-renovate-branches: true

@@ -46,11 +46,16 @@ the pushed commit starts a new run that passes.
 jobs:
   go-generated:
     uses: scality/workflows/.github/workflows/go-generated.yaml@v2
-    secrets: inherit
+    secrets:
+      ACTIONS_APP_PRIVATE_KEY: ${{ secrets.ACTIONS_APP_PRIVATE_KEY }}
     with:
       push-to-renovate-branches: true
       actions-app-id: ${{ vars.ACTIONS_APP_ID }}
 ```
+
+Pass the secrets one by one, not with `secrets: inherit`: the commands can read
+`GIT_ACCESS_TOKEN`, so only pass it when the repository needs private modules, and only
+with a read-only token.
 
 How it stays safe:
 
