@@ -43,6 +43,7 @@ nav:
 - Trivy: trivy.md
 - Release & Promote: release-promote.md
 - Git LFS warning: lfs-warning.md
+- Go generated files: go-generated.md
 - Known issues: known-issues.md
 
 markdown_extensions:

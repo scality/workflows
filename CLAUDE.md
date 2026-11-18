@@ -21,6 +21,7 @@ This is **scality/workflows**, a repository of reusable GitHub Actions workflows
 | `lfs-warning.yaml` | Validates file sizes in PRs, warns about files not tracked by Git LFS |
 | `release.yaml` | Computes the next semver off the last GA tag and pushes an annotated `v*` tag |
 | `promote.yaml` | Creates a GitHub Release from a pushed `v*` tag (pre-release on hyphenated tags) |
+| `go-generated.yaml` | Reruns the Go code generation (`go mod tidy`, `go generate`, ...) and fails when the result differs from what is committed |
 | `claude-code-review.yml` | AI-powered PR review via Anthropic API (Workload Identity Federation), reports costs to `cost-center-review` |
 | `claude-code-dependency-review.yml` | AI-powered review of Dependabot/Renovate bumps via Anthropic API (Workload Identity Federation), reports costs to `cost-center-review` |
 
