@@ -23,11 +23,6 @@ on:
         required: false
         default: .
         type: string
-      runs-on:
-        description: 'Runner label'
-        required: false
-        default: ubuntu-26.04
-        type: string
       push-to-renovate-branches:
         description: 'On a renovate/* branch of this repository, push the regenerated code instead of only failing'
         required: false
@@ -76,7 +71,7 @@ jobs:
           fi
 
   go-generated:
-    runs-on: ${{ inputs.runs-on }}
+    runs-on: ubuntu-26.04
     outputs:
       patch: ${{ steps.patch.outputs.patch }}
       artifact: ${{ steps.patch.outputs.artifact }}
@@ -158,7 +153,6 @@ jobs:
       && inputs.push-to-renovate-branches && github.event_name == 'pull_request'
       && startsWith(github.head_ref, 'renovate/')
       && github.event.pull_request.head.repo.full_name == github.repository }}
-    # Not inputs.runs-on: this job holds a write token, so it gets a fresh GitHub-hosted VM.
     runs-on: ubuntu-26.04
     steps:
       - uses: actions/create-github-app-token@v3

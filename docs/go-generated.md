@@ -71,8 +71,6 @@ How it stays safe:
   the other calls push nothing, and the next run regenerates the remaining modules.
 - It does not loop: when files the App already regenerated on the branch still differ,
   the job fails instead of pushing again.
-- The push job runs on a fresh GitHub-hosted runner, whatever `runs-on` says: it holds a
-  write token, and must not share a machine with the job that ran the generators.
 - It does not force-push. If Renovate moved the branch meanwhile, it pushes nothing: the
   new commit starts its own run, which regenerates again.
 
@@ -102,7 +100,6 @@ updated like any other dependency.
 | ------------------- | ------------------------------------ | ------------------------------------ |
 | `commands`          | Commands that regenerate the code    | `go mod tidy` and `go generate ./...` |
 | `working-directory` | Directory that holds the `go.mod`    | `.`                                  |
-| `runs-on`           | Runner label                         | `ubuntu-26.04`                       |
 | `push-to-renovate-branches` | Push the regenerated code on a `renovate/*` branch | `false` |
 | `actions-app-id`    | GitHub App ID used for that push (usually `vars.ACTIONS_APP_ID`) | `''` |
 
