@@ -102,7 +102,7 @@ updated like any other dependency.
 | ------------------- | ------------------------------------ | ------------------------------------ |
 | `commands`          | Commands that regenerate the code    | `go mod tidy` and `go generate ./...` |
 | `working-directory` | Directory that holds the `go.mod`    | `.`                                  |
-| `runs-on`           | Runner label                         | `ubuntu-24.04`                       |
+| `runs-on`           | Runner label                         | `ubuntu-26.04`                       |
 | `push-to-renovate-branches` | Push the regenerated code on a `renovate/*` branch | `false` |
 | `actions-app-id`    | GitHub App ID used for that push (usually `vars.ACTIONS_APP_ID`) | `''` |
 
