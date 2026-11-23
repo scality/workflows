@@ -135,6 +135,20 @@ jobs:
       - name: Validate ${{ env.RELEASE_TAG }} tag
         run: ./semver validate "$RELEASE_TAG"
 
+      - name: Check ${{ env.RELEASE_TAG }} is above this branch's tags
+        # The base version is the last GA tag, so a scope smaller than a pending
+        # pre-release (e.g. patch after v1.1.0-beta.1) computes a lower version.
+        # Compared with semver, not git's version sort, which puts v1.1.0-beta.1
+        # after v1.1.0. Non-semver tags (e.g. moving major tags like v2) are skipped.
+        run: |
+          while read -r tag; do
+            [[ "$(./semver validate "$tag")" == "valid" ]] || continue
+            if [[ "$(./semver compare "$RELEASE_TAG" "$tag")" -le 0 ]]; then
+              echo "::error::$RELEASE_TAG is not above $tag, already on this branch: pick a larger version-scope or a later version-type"
+              exit 1
+            fi
+          done < <(git tag --merged HEAD --list "v*")
+
       - name: Create and push `${{ env.RELEASE_TAG }}` tag
         if: ${{ !inputs.dry-run }}
         env:

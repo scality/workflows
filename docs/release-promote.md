@@ -161,3 +161,8 @@ To prefix the title, pass `product-name` from the caller:
 - `alpha`/`beta` types append or increment a pre-release suffix
   (`v1.2.3-alpha.1`, `v1.2.3-alpha.2`, ...); `GA` produces a bare `vX.Y.Z`.
 - With no GA tag in history (first release), the base falls back to `0.0.0`.
+- The computed tag must be above every semver tag reachable from the current
+  branch, or the run fails before pushing. For example, `patch` after
+  `v1.1.0-beta.1` would compute `v1.0.1-beta.1`, which is refused: use
+  `minor`. A maintenance branch that doesn't contain `v1.1.0-beta.1` can still
+  cut `v1.0.1-*`.
