@@ -1,0 +1,138 @@
+name: Dependency Merge
+
+on:
+  workflow_call:
+    inputs:
+      pr-number:
+        type: number
+        required: true
+        description: Number of the Renovate pull request to merge
+      review-approved:
+        type: boolean
+        default: false
+        description: The approved output of claude-code-dependency-review.yml, when called right after it
+      merge-app-id:
+        type: string
+        required: false
+        description: ID of the GitHub App that merges, when it is not the DEPENDENCY_MERGE_APP_ID variable of the environment. Make the App a bypass actor of the code owner ruleset only
+      environment:
+        type: string
+        default: dependency-merge
+        description: Environment that holds the App key as the MERGE_APP_PRIVATE_KEY secret and its ID as the DEPENDENCY_MERGE_APP_ID variable. Restrict it to the default branch
+      merge-method:
+        type: string
+        default: merge
+        description: Merge method, one of merge, squash or rebase
+
+permissions: {}
+
+jobs:
+  merge:
+    runs-on: ubuntu-26.04
+    timeout-minutes: 5
+    # Environment secrets cannot be passed by the caller: the job reads the key from it.
+    # No concurrency group: every step can run twice, and the merge is pinned to a SHA.
+    environment: ${{ inputs.environment }}
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app-token
+        with:
+          app-id: ${{ inputs.merge-app-id || vars.DEPENDENCY_MERGE_APP_ID }}
+          private-key: ${{ secrets.MERGE_APP_PRIVATE_KEY }}
+          repositories: ${{ github.event.repository.name }}
+          permission-contents: write
+          permission-pull-requests: write
+          permission-statuses: write
+          # Most eligible updates are GitHub Actions bumps: merging a change under
+          # .github/workflows/ needs this permission.
+          permission-workflows: write
+
+      - name: Merge the PR if the dependency review approved it
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          GH_REPO: ${{ github.repository }}
+          PR: ${{ inputs.pr-number }}
+          REVIEW_APPROVED: ${{ inputs.review-approved }}
+          # On the call that follows the review, the commit that the review read.
+          REVIEWED_SHA: ${{ github.event.pull_request.head.sha }}
+          APP_BOT: ${{ steps.app-token.outputs.app-slug }}[bot]
+          METHOD: ${{ inputs.merge-method }}
+          CONTEXT: dependency-review/approved
+        run: |
+          set -euo pipefail
+          skip() { echo "::notice::PR #$PR not merged: $1"; exit 0; }
+          case "$METHOD" in merge|squash|rebase) ;; *) echo "::error::invalid merge-method: $METHOD"; exit 1 ;; esac
+
+          pr=$(gh api "repos/$GH_REPO/pulls/$PR")
+          head=$(jq -r .head.sha <<<"$pr")
+          [ "$(jq -r .state <<<"$pr")" = open ] || skip "it is not open"
+          [ "$(jq -r .user.login <<<"$pr")" = "scality-renovate[bot]" ] || skip "Renovate did not open it"
+          # The rulesets that require the CI and the approval protect the default branch.
+          jq -e '.base.ref == .base.repo.default_branch' <<<"$pr" >/dev/null || skip "it does not target the default branch"
+          # Renovate adds no-automerge when one update of the PR is not eligible. It stops
+          # syncing the labels of a PR once someone edits them, so read the labels it
+          # computed on its last run, kept in the renovate-debug block of the PR body.
+          # Renovate writes it last, after the release notes, which could hold a fake one.
+          # A no-automerge label added by a human still blocks.
+          wanted=$(jq -r '.body // ""' <<<"$pr" | sed -n 's/.*<!--renovate-debug:\([A-Za-z0-9+/=]*\)-->.*/\1/p' \
+            | tail -n1 | base64 -d 2>/dev/null | jq -c '.labels // []' 2>/dev/null || echo '[]')
+          jq -e 'index("automerge") and (index("no-automerge") | not)' <<<"$wanted" >/dev/null \
+            || skip "Renovate did not label it automerge, or labelled it no-automerge"
+          jq -e '[.labels[].name] | index("no-automerge") | not' <<<"$pr" >/dev/null || skip "labelled no-automerge"
+
+          # Renovate commits are made through the API: GitHub signs them as web-flow.
+          # Any other commit, a human fix or a go-generated regeneration, needs a code owner.
+          others=$(gh api --paginate "repos/$GH_REPO/pulls/$PR/commits" --jq '.[]
+            | select(.author.login != "scality-renovate[bot]" or .committer.login != "web-flow"
+                     or (.commit.verification.verified | not))
+            | .sha[0:7]')
+          [ -z "$others" ] || skip "commits not made by Renovate: $others"
+
+          # go mod tidy raises the go or toolchain line when a dependency needs a newer Go.
+          # A Go bump stays a deliberate merge. GitHub omits the patch of a large file.
+          gomod=$(gh api --paginate "repos/$GH_REPO/pulls/$PR/files" \
+            --jq '.[] | select(.filename | test("(^|/)go[.]mod$")) | .patch // "NO-PATCH"')
+          if grep -qE '^([+-](go|toolchain) |NO-PATCH$)' <<<"$gomod"; then
+            skip "it changes the go or toolchain line of a go.mod"
+          fi
+
+          # Proof that Claude approved this commit. Any workflow can approve as
+          # github-actions[bot], but only this App can set the status, and only from a
+          # review run whose execution log shows the approval.
+          # gh output goes to a variable first: piped into grep -q, gh can die of SIGPIPE.
+          if [ "$REVIEW_APPROVED" = true ]; then
+            # gh pr review approves the head at the time of the call, which can be newer
+            # than the commit the review read.
+            [ "$head" = "$REVIEWED_SHA" ] || skip "the head moved since the review"
+            # The latest review of github-actions[bot] on this commit, not any of them.
+            last_state=$(gh api "repos/$GH_REPO/pulls/$PR/reviews" --paginate \
+              --jq ".[] | select(.user.login == \"github-actions[bot]\" and .commit_id == \"$head\") | .state" | tail -n1)
+            [ "$last_state" = APPROVED ] || skip "no github-actions approval on $head"
+            gh api -X POST "repos/$GH_REPO/statuses/$head" -f state=success -f context="$CONTEXT" \
+              -f description="Approved by the Claude dependency review" >/dev/null
+          fi
+          status=$(gh api "repos/$GH_REPO/commits/$head/statuses" --paginate \
+            --jq ".[] | select(.context == \"$CONTEXT\" and .creator.login == \"$APP_BOT\" and .state == \"success\") | .id")
+          [ -n "$status" ] || skip "no approval of the dependency review on $head"
+
+          # GitHub still enforces the other rulesets (approval, required checks). A refusal
+          # is expected while the CI runs: its end calls this workflow again.
+          if ! out=$(gh api -X PUT "repos/$GH_REPO/pulls/$PR/merge" \
+              -f merge_method="$METHOD" -f sha="$head" 2>/tmp/merge-error); then
+            msg=$(jq -r '.message // empty' <<<"$out" 2>/dev/null | tr '\n' ' ')
+            # Waiting for the CI or for an approval is expected: the next call merges.
+            # Anything else needs a human: merge method not allowed, or a code owner
+            # review asked, which means the App is not a bypass actor of that ruleset.
+            if grep -qE 'HTTP (405|409|422)' /tmp/merge-error && ! grep -qi 'code owner' <<<"$msg" \
+              && grep -qiE 'status check|review|approv|in progress|expected|pending|head branch was modified' <<<"$msg"; then
+              skip "$msg"
+            fi
+            cat /tmp/merge-error
+            echo "::error::PR #$PR not merged: ${msg:-see the error above}"
+            exit 1
+          fi
+          # Marks the PR for the human check before a product release. This call creates
+          # the label when the repository does not have it yet.
+          gh api -X POST "repos/$GH_REPO/issues/$PR/labels" -f "labels[]=automerged" >/dev/null \
+            || echo "::warning::could not add the automerged label"
+          echo "::notice::PR #$PR merged"

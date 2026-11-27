@@ -79,8 +79,8 @@ Limits:
 - On a Renovate branch, the commands run on the branch head, not on its merge with the
   base branch. A base change that needs regeneration is caught on the next PR.
 - The pushed code is what the generators wrote. A compromised generator could add code
-  there, so keep these PRs under human review: do not automerge a PR that holds a
-  regeneration commit.
+  there, so keep these PRs under human review. The commit is not made by Renovate, so
+  `dependency-merge.yaml` never merges a PR that holds one.
 
 The inputs are checked on every PR: a missing App ID or key fails the run when a push
 is due, and only warns otherwise, so PRs that get no Actions secrets (Dependabot, forks)

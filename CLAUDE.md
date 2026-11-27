@@ -24,6 +24,7 @@ This is **scality/workflows**, a repository of reusable GitHub Actions workflows
 | `go-generated.yaml` | Reruns the Go code generation (`go mod tidy`, `go generate`, ...) and fails when the result differs from what is committed; can push the regenerated code on Renovate branches |
 | `claude-code-review.yml` | AI-powered PR review via Anthropic API (Workload Identity Federation), reports costs to `cost-center-review` |
 | `claude-code-dependency-review.yml` | AI-powered review of Dependabot/Renovate bumps via Anthropic API (Workload Identity Federation), reports costs to `cost-center-review` |
+| `dependency-merge.yaml` | Merges a Renovate PR with a dedicated GitHub App once the dependency review approved it and the CI is green; the App bypasses the code owner ruleset only |
 
 ## Conventions
 
