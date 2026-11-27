@@ -58,10 +58,16 @@ on:
         required: false
         default: "cost-center-review"
         description: Repository (in the same org) where monthly cost reports are written
+    outputs:
+      approved:
+        description: "'true' when Claude approved the PR in this run, read from its execution log"
+        value: ${{ jobs.dependency-review.outputs.approved }}
 
 jobs:
   dependency-review:
     runs-on: ubuntu-latest
+    outputs:
+      approved: ${{ steps.approval.outputs.approved }}
     timeout-minutes: 15
     permissions:
       contents: read
@@ -156,7 +162,7 @@ jobs:
           anthropic_organization_id: ${{ inputs.anthropic_organization_id }}
           anthropic_service_account_id: ${{ inputs.anthropic_service_account_id }}
           anthropic_workspace_id: ${{ inputs.anthropic_workspace_id }}
-          allowed_bots: "dependabot[bot], scality-renovate[bot]"
+          allowed_bots: "dependabot[bot], scality-renovate[bot], eve-ci-cd[bot]"
           plugin_marketplaces: ${{ steps.marketplace.outcome == 'success' && './.marketplaces/scality-agent-hub' || 'https://github.com/scality/agent-hub.git' }}
           plugins: scality-skills@scality-agent-hub
           prompt: "/review-dependency-bump REPO: ${{ github.repository }} PR_NUMBER: ${{ github.event.pull_request.number }}"
@@ -165,6 +171,39 @@ jobs:
             --model "${{ inputs.model }}"
         env:
           ANTHROPIC_USER_ID: ${{ github.repository }}
+
+      # Any workflow of the repo can approve as github-actions[bot]. The execution log
+      # of this run is the proof that Claude itself approved: dependency-merge.yaml
+      # merges only on it.
+      - name: Check that Claude approved the PR
+        id: approval
+        if: always()
+        env:
+          EXECUTION_FILE: ${{ steps.dependency-review.outputs.execution_file }}
+          PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          # The last review that Claude posted on this PR in the run decides: an approval
+          # followed by a request for changes is not an approval. It counts only in the
+          # form the review-dependency-bump skill uses, pinned to the commit this run
+          # reviewed. Any other form gives false, and the PR waits for a human.
+          repo_re=$(printf '%s' "$GITHUB_REPOSITORY" | sed 's/[.]/\\./g')
+          approved=false
+          if [ -n "$EXECUTION_FILE" ] && [ -f "$EXECUTION_FILE" ] && jq -e --arg pr "$PR" --arg repo "$repo_re" --arg sha "$HEAD_SHA" '
+              ([.[] | select(.type == "assistant") | .message.content[]?
+                | select(.type == "tool_use" and .name == "Bash"
+                         and (.input.command | test("^gh pr review \($pr)( |$)|^gh api (-X POST |--method POST )?repos/\($repo)/pulls/\($pr)/reviews( |$)")))] | last) as $t
+              | if $t == null then false
+                else ($t.input.command | split(" -f body=")[0]) as $flags
+                  | ($flags | test("^gh api -X POST repos/\($repo)/pulls/\($pr)/reviews "))
+                  and ($flags | test(" -f event=APPROVE( |$)"))
+                  and ($flags | test(" -f commit_id=\($sha)( |$)"))
+                  and any(.[] | select(.type == "user") | .message.content[]?;
+                          .type == "tool_result" and .tool_use_id == $t.id and .is_error != true)
+                end' "$EXECUTION_FILE" >/dev/null; then
+            approved=true
+          fi
+          echo "approved=$approved" >> "$GITHUB_OUTPUT"
 
       - name: Get token for cost reporting
         id: cost-token

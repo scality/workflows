@@ -44,6 +44,7 @@ nav:
 - Release & Promote: release-promote.md
 - Git LFS warning: lfs-warning.md
 - Go generated files: go-generated.md
+- Dependency merge: dependency-merge.md
 - Known issues: known-issues.md
 
 markdown_extensions:
