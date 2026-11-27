@@ -181,19 +181,23 @@ jobs:
         env:
           EXECUTION_FILE: ${{ steps.dependency-review.outputs.execution_file }}
           PR: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          # The last `gh pr review` of this PR in the run decides: an approval followed
-          # by a request for changes is not an approval. Only the form the
-          # review-dependency-bump skill uses counts. Any other form gives false, and
-          # the PR waits for a human.
+          # The last review that Claude posted on this PR in the run decides: an approval
+          # followed by a request for changes is not an approval. It counts only in the
+          # form the review-dependency-bump skill uses, pinned to the commit this run
+          # reviewed. Any other form gives false, and the PR waits for a human.
           repo_re=$(printf '%s' "$GITHUB_REPOSITORY" | sed 's/[.]/\\./g')
           approved=false
-          if [ -n "$EXECUTION_FILE" ] && [ -f "$EXECUTION_FILE" ] && jq -e --arg pr "$PR" --arg repo "$repo_re" '
+          if [ -n "$EXECUTION_FILE" ] && [ -f "$EXECUTION_FILE" ] && jq -e --arg pr "$PR" --arg repo "$repo_re" --arg sha "$HEAD_SHA" '
               ([.[] | select(.type == "assistant") | .message.content[]?
                 | select(.type == "tool_use" and .name == "Bash"
-                         and (.input.command | test("^gh pr review \($pr)( |$)")))] | last) as $t
+                         and (.input.command | test("^gh pr review \($pr)( |$)|^gh api (-X POST |--method POST )?repos/\($repo)/pulls/\($pr)/reviews( |$)")))] | last) as $t
               | if $t == null then false
-                else ($t.input.command | test("^gh pr review \($pr) (--repo \($repo) )?--approve( |$)"))
+                else ($t.input.command | split(" -f body=")[0]) as $flags
+                  | ($flags | test("^gh api -X POST repos/\($repo)/pulls/\($pr)/reviews "))
+                  and ($flags | test(" -f event=APPROVE( |$)"))
+                  and ($flags | test(" -f commit_id=\($sha)( |$)"))
                   and any(.[] | select(.type == "user") | .message.content[]?;
                           .type == "tool_result" and .tool_use_id == $t.id and .is_error != true)
                 end' "$EXECUTION_FILE" >/dev/null; then
