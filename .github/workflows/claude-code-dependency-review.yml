@@ -156,7 +156,7 @@ jobs:
           anthropic_organization_id: ${{ inputs.anthropic_organization_id }}
           anthropic_service_account_id: ${{ inputs.anthropic_service_account_id }}
           anthropic_workspace_id: ${{ inputs.anthropic_workspace_id }}
-          allowed_bots: "dependabot[bot], scality-renovate[bot]"
+          allowed_bots: "dependabot[bot], scality-renovate[bot], eve-ci-cd[bot]"
           plugin_marketplaces: ${{ steps.marketplace.outcome == 'success' && './.marketplaces/scality-agent-hub' || 'https://github.com/scality/agent-hub.git' }}
           plugins: scality-skills@scality-agent-hub
           prompt: "/review-dependency-bump REPO: ${{ github.repository }} PR_NUMBER: ${{ github.event.pull_request.number }}"
